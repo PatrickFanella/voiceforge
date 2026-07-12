@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { extractVoiceIntent } from '@/features/voice/extract-intent';
 import { createTranscriptionClient } from '@/features/voice/transcription';
+import { deleteAudioFile } from '@/features/voice/retention';
 import { useApp } from '@/providers/AppProvider';
 import type { VoiceLog } from '@/types';
 
@@ -63,7 +64,7 @@ export default function VoiceReviewScreen() {
         category,
         processed: true,
         jobId: selectedJobId || undefined,
-        audioUri,
+        audioUri: audioUri?.startsWith('blob:') ? undefined : audioUri,
         confidence: transcriptionConfidence ?? intent.confidence,
         provider,
       });
@@ -138,7 +139,7 @@ export default function VoiceReviewScreen() {
       <TouchableOpacity accessibilityRole="button" accessibilityLabel="Save reviewed voice log" disabled={saving} style={styles.save} onPress={() => void save()}>
         <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save reviewed log'}</Text>
       </TouchableOpacity>
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cancel transcript review" style={styles.cancel} onPress={() => router.back()}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cancel transcript review" style={styles.cancel} onPress={() => { deleteAudioFile(audioUri); router.back(); }}>
         <Text style={styles.cancelText}>Cancel</Text>
       </TouchableOpacity>
     </ScrollView>

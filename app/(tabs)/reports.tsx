@@ -21,6 +21,7 @@ import {
 import { Colors } from '@/constants/colors';
 import { useApp } from '@/providers/AppProvider';
 import VoiceButton from '@/components/VoiceButton';
+import { ScreenState } from '@/components/ScreenState';
 import * as Haptics from 'expo-haptics';
 
 type TabType = 'safety' | 'time';
@@ -148,6 +149,7 @@ export default function ReportsScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
+          ListEmptyComponent={<ScreenState empty="No safety reports yet." />}
         />
       ) : (
         <SectionList
@@ -192,6 +194,7 @@ export default function ReportsScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
+          ListEmptyComponent={<ScreenState empty="No time entries yet." />}
         />
       )}
 

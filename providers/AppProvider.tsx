@@ -177,6 +177,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const clearData = useCallback(async () => {
     const repository = await getRepository();
     await withRepositoryError('clear local data', () => repository.clearUserData());
+    cleanupRetainedAudio([], 7);
     setJobs([]);
     setTimeEntries([]);
     setSafetyReports([]);
