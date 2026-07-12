@@ -8,7 +8,10 @@
     "start-web-dev": "DEBUG=expo* bunx rork start -p br8w32qx0bjc6k5jqxf4i --web --tunnel",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "export:web": "expo export --platform web"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "export:web": "expo export --platform web",
+    "verify": "bun run typecheck && bun run lint && bun run test && bun run export:web"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -52,7 +55,8 @@
     "@types/react": "~19.1.10",
     "eslint": "^9.31.0",
     "eslint-config-expo": "~10.0.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vitest": "^3.2.4"
   },
   "private": true
 }

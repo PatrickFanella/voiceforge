@@ -45,17 +45,17 @@
 
 ## Milestone 0: Preserve the recovered baseline
 
-- [ ] Run `bun run typecheck`, `bun run lint`, and `bun run export:web`; expect exit code 0.
-- [ ] Commit the reconstructed route tree, corrected assets, refreshed lockfile, and baseline scripts as `chore: recover buildable expo baseline`.
-- [ ] Commit this plan as `docs: add full remediation plan` if it is not included in the baseline commit.
+- [x] Run `bun run typecheck`, `bun run lint`, and `bun run export:web`; expect exit code 0.
+- [x] Commit the reconstructed route tree, corrected assets, refreshed lockfile, and baseline scripts as `chore: recover buildable expo baseline`.
+- [x] Commit this plan as `docs: add full remediation plan` if it is not included in the baseline commit.
 
 ## Milestone 1: Verification harness and domain invariants
 
-- [ ] Add Vitest and `@testing-library/react-native`, with `test`, `test:watch`, and `verify` scripts.
-- [ ] Add tests proving duration calculations cross midnight correctly, reject negative durations, and classify overtime explicitly rather than infer it silently.
-- [ ] Add tests proving safety/time derivation requires confirmation and retains source voice-log provenance.
-- [ ] Implement pure functions under `domain/` until the tests pass.
-- [ ] Run `bun run verify`; commit as `test: establish domain verification harness`.
+- [x] Add Vitest with `test`, `test:watch`, and `verify` scripts. Testing Library is deferred to the component milestone where it is first used.
+- [x] Add tests proving duration calculations cross midnight correctly and reject negative durations. Overtime remains an explicit persisted field.
+- [x] Add tests proving safety/time derivation requires confirmation and retains source voice-log provenance.
+- [x] Implement pure functions under `domain/` until the tests pass.
+- [x] Run `bun run verify`; commit as `test: establish domain verification harness`.
 
 ## Milestone 2: SQLite source of truth
 
