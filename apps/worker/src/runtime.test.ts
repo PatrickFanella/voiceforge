@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { parseRedisConnection, recoverQueuedJobs } from './runtime.js';
+import { createWebhookSignature, exportRowsToCsv, parseRedisConnection, recoverQueuedJobs, webhookRetryDelay } from './runtime.js';
 import { Queue, QueueEvents, Worker } from 'bullmq';
 
 describe('worker runtime', () => {
@@ -18,6 +18,13 @@ describe('worker runtime', () => {
     expect(queue.add).toHaveBeenCalledWith('transcribe', { jobId: 'job-1' }, expect.objectContaining({
       jobId: 'job-1', attempts: 5, backoff: { type: 'exponential', delay: 2000 },
     }));
+  });
+
+  it('escapes CSV and signs exact webhook bytes with bounded backoff', () => {
+    expect(exportRowsToCsv([{ id: '1', notes: 'a,"quoted" note' }])).toBe('id,notes\n1,"a,""quoted"" note"\n');
+    expect(createWebhookSignature('secret', 123, '{"id":1}')).toMatch(/^t=123,v1=[a-f0-9]{64}$/);
+    expect(webhookRetryDelay(1)).toBe(2_000);
+    expect(webhookRetryDelay(6)).toBe(64_000);
   });
 });
 

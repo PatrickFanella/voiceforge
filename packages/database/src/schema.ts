@@ -42,6 +42,8 @@ export const safetySeverity = pgEnum('safety_severity', ['low', 'medium', 'high'
 export const deliveryChannel = pgEnum('delivery_channel', ['push', 'email']);
 export const deliveryStatus = pgEnum('delivery_status', ['queued', 'sent', 'failed', 'suppressed', 'dead_letter']);
 export const subscriptionStatus = pgEnum('subscription_status', ['incomplete', 'trialing', 'active', 'past_due', 'unpaid', 'paused', 'canceled']);
+export const exportStatus = pgEnum('export_status', ['queued', 'processing', 'completed', 'failed', 'expired']);
+export const webhookDeliveryStatus = pgEnum('webhook_delivery_status', ['queued', 'delivering', 'delivered', 'retrying', 'dead_letter']);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey(),
@@ -409,3 +411,24 @@ export const usageCounters = pgTable('usage_counters', {
   exportCount: integer('export_count').notNull().default(0),
   ...timestamps(),
 }, (table) => [primaryKey({ columns: [table.workspaceId, table.period] })]);
+
+export const exportJobs = pgTable('export_jobs', {
+  id: uuid('id').primaryKey(), workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  requestedBy: uuid('requested_by').notNull().references(() => users.id), format: text('format').notNull(), scope: text('scope').notNull(),
+  status: exportStatus('status').notNull().default('queued'), objectKey: text('object_key'), rowCount: integer('row_count'),
+  errorMessage: text('error_message'), expiresAt: timestamp('expires_at', { withTimezone: true }), completedAt: timestamp('completed_at', { withTimezone: true }), ...timestamps(),
+}, (table) => [index('export_jobs_workspace_status_idx').on(table.workspaceId, table.status, table.createdAt)]);
+
+export const webhookEndpoints = pgTable('webhook_endpoints', {
+  id: uuid('id').primaryKey(), workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  url: text('url').notNull(), secretEncrypted: text('secret_encrypted').notNull(), enabled: boolean('enabled').notNull().default(true),
+  eventTypes: jsonb('event_types').$type<string[]>().notNull().default([]), lastAuditSequence: bigint('last_audit_sequence', { mode: 'number' }).notNull().default(0), ...timestamps(),
+}, (table) => [index('webhook_endpoints_workspace_idx').on(table.workspaceId, table.enabled)]);
+
+export const webhookDeliveries = pgTable('webhook_deliveries', {
+  id: uuid('id').primaryKey(), workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  endpointId: uuid('endpoint_id').notNull().references(() => webhookEndpoints.id, { onDelete: 'cascade' }), eventType: text('event_type').notNull(),
+  entityType: text('entity_type').notNull(), entityId: uuid('entity_id'), payload: jsonb('payload').notNull(), status: webhookDeliveryStatus('status').notNull().default('queued'),
+  attemptCount: integer('attempt_count').notNull().default(0), nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+  responseStatus: integer('response_status'), responseBody: text('response_body'), lastError: text('last_error'), deliveredAt: timestamp('delivered_at', { withTimezone: true }), ...timestamps(),
+}, (table) => [index('webhook_deliveries_due_idx').on(table.status, table.nextAttemptAt), index('webhook_deliveries_workspace_idx').on(table.workspaceId, table.createdAt)]);

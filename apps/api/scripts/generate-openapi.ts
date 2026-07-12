@@ -25,6 +25,7 @@ const app = await buildApp({
     queue: { enqueue: unavailable },
   },
   billing: { repository: { get: unavailable, saveCustomer: unavailable, findCustomer: unavailable, setPendingSeatQuantity: unavailable, reconcile: unavailable }, stripe: { createCustomer: unavailable, createCheckout: unavailable, createPortal: unavailable, updateSeats: unavailable, parseWebhook: unavailable } },
+  integrations: { repository: { createExport: unavailable, getExport: unavailable, listExports: unavailable, createEndpoint: unavailable, listEndpoints: unavailable, listDeliveries: unavailable, setEndpointEnabled: unavailable, replayDelivery: unavailable }, exportQueue: { enqueue: unavailable }, exportStorage: { signDownload: unavailable }, secretKey: 'openapi-generation-secret' },
 });
 await app.ready();
 await writeFile(new URL('../openapi.json', import.meta.url), `${JSON.stringify(app.swagger(), null, 2)}\n`);

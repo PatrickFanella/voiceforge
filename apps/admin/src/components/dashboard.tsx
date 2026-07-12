@@ -14,6 +14,9 @@ type TimeEntry = { id: string; workerUserId: string; status: string; totalMinute
 type SafetyReport = { id: string; severity: string; status: string; reportType: string; description: string; acknowledgementDueAt: string | null; escalationLevel: number };
 type Delivery = { id: string; channel: string; destination: string; eventType: string; status: string; attemptCount: number; lastError: string | null };
 type BillingState = { subscription: null | { status: string; seatQuantity: number; pendingSeatQuantity: number | null; currentPeriodEnd: string | null }; entitlement: { mutationEnabled: boolean; seatLimit: number }; activeSeats: number };
+type WebhookEndpoint = { id: string; url: string; enabled: boolean; eventTypes: string[] };
+type WebhookDelivery = { id: string; eventType: string; status: string; attemptCount: number; lastError: string | null };
+type ExportJob = { id: string; format: string; scope: string; status: string; rowCount: number | null; downloadUrl: string | null };
 
 export function Dashboard({ userName }: { userName: string }) {
   const [view, setView] = useState<View>('overview');
@@ -25,6 +28,8 @@ export function Dashboard({ userName }: { userName: string }) {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [jobs, setJobs] = useState<Array<{ id: string; name: string; status: string; address: string | null }>>([]);
   const [billing, setBilling] = useState<BillingState | null>(null);
+  const [webhookEndpoints, setWebhookEndpoints] = useState<WebhookEndpoint[]>([]); const [webhookDeliveries, setWebhookDeliveries] = useState<WebhookDelivery[]>([]);
+  const [exports, setExports] = useState<ExportJob[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState('');
@@ -63,15 +68,18 @@ export function Dashboard({ userName }: { userName: string }) {
     if (!workspaceId) return;
     setError(null);
     const safe = async <T,>(path: string, fallback: T) => { try { return await request<T>(path); } catch { return fallback; } };
-    const [memberData, jobData, timeData, safetyData, deliveryData, billingData] = await Promise.all([
+    const [memberData, jobData, timeData, safetyData, deliveryData, billingData, endpointData, webhookDeliveryData, exportData] = await Promise.all([
       safe<{ data: Member[] }>(`/v1/workspaces/${workspaceId}/memberships`, { data: [] }),
       safe<{ data: typeof jobs }>(`/v1/workspaces/${workspaceId}/jobs`, { data: [] }),
       safe<{ data: TimeEntry[] }>(`/v1/time-approvals?workspaceId=${workspaceId}`, { data: [] }),
       safe<{ data: SafetyReport[] }>(`/v1/safety-reports?workspaceId=${workspaceId}`, { data: [] }),
       safe<{ data: Delivery[] }>(`/v1/admin/delivery-diagnostics?workspaceId=${workspaceId}`, { data: [] }),
       safe<BillingState | null>(`/v1/billing/status?workspaceId=${workspaceId}`, null),
+      safe<{ data: WebhookEndpoint[] }>(`/v1/webhook-endpoints?workspaceId=${workspaceId}`, { data: [] }),
+      safe<{ data: WebhookDelivery[] }>(`/v1/webhook-deliveries?workspaceId=${workspaceId}`, { data: [] }),
+      safe<{ data: ExportJob[] }>(`/v1/exports?workspaceId=${workspaceId}`, { data: [] }),
     ]);
-    setMembers(memberData.data); setJobs(jobData.data); setTimeEntries(timeData.data); setSafety(safetyData.data); setDeliveries(deliveryData.data); setBilling(billingData);
+    setMembers(memberData.data); setJobs(jobData.data); setTimeEntries(timeData.data); setSafety(safetyData.data); setDeliveries(deliveryData.data); setBilling(billingData); setWebhookEndpoints(endpointData.data); setWebhookDeliveries(webhookDeliveryData.data); setExports(exportData.data);
   }, [request, workspaceId]);
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -100,7 +108,8 @@ export function Dashboard({ userName }: { userName: string }) {
       {view === 'deliveries' && <Panel title="Delivery diagnostics"><table><thead><tr><th>Channel</th><th>Destination</th><th>Event</th><th>Status</th><th>Attempts</th></tr></thead><tbody>{deliveries.map((item) => <tr key={item.id}><td>{item.channel}</td><td>{item.destination}</td><td>{item.eventType}</td><td><Status value={item.status} /></td><td>{item.attemptCount}</td></tr>)}</tbody></table></Panel>}
       {view === 'policies' && <PolicyPanel workspaceId={workspaceId} mutate={mutate} />}
       {view === 'billing' && (workspace?.kind === 'team' && workspace.role === 'owner' ? <BillingPanel state={billing} workspaceId={workspaceId} request={request} /> : <Restricted />)}
-      {(['audit', 'integrations'] as View[]).includes(view) && <Panel title={NAV_ITEMS.find(([id]) => id === view)?.[1] ?? view}><p className="muted">This control surface is connected as its backend milestone lands. Current access remains read-only and no settings are implied.</p></Panel>}
+      {view === 'integrations' && (workspace?.kind === 'team' && ['owner', 'admin'].includes(workspace.role) ? <IntegrationsPanel workspaceId={workspaceId} exports={exports} endpoints={webhookEndpoints} deliveries={webhookDeliveries} request={request} refresh={refresh} /> : <Restricted />)}
+      {view === 'audit' && <Panel title="Audit"><p className="muted">Audit search connects with the records-governance milestone. Existing operational evidence remains append-only.</p></Panel>}
     </main>
   </div>;
 }
@@ -119,4 +128,7 @@ function PolicyPanel({ workspaceId, mutate }: { workspaceId: string; mutate: (pa
 function BillingPanel({ state, workspaceId, request }: { state: BillingState | null; workspaceId: string; request: <T>(path: string, init?: RequestInit) => Promise<T> }) {
   const redirect = async (path: string, body: unknown) => { const result = await request<{ url: string }>(path, { method: 'POST', body: JSON.stringify(body) }); window.location.assign(result.url); };
   return <div className="grid"><Panel title="Subscription"><p><Status value={state?.subscription?.status ?? 'not_subscribed'} /></p><p className="muted">{state?.activeSeats ?? 1} active of {state?.entitlement.seatLimit ?? 1} seats{state?.subscription?.pendingSeatQuantity ? ` · ${state.subscription.pendingSeatQuantity} at renewal` : ''}</p>{state?.subscription ? <button onClick={() => void redirect('/v1/billing/portal', { workspaceId, returnUrl: window.location.href })}>Open billing portal</button> : <button onClick={() => void redirect('/v1/billing/checkout', { workspaceId, quantity: Math.max(1, state?.activeSeats ?? 1), successUrl: window.location.href, cancelUrl: window.location.href })}>Start team plan</button>}</Panel>{state?.subscription && <Panel title="Seat quantity"><form onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); void request('/v1/billing/seats', { method: 'POST', body: JSON.stringify({ workspaceId, quantity: Number(form.get('quantity')) }) }); }}><label>Seats<input name="quantity" type="number" min={state.activeSeats} defaultValue={state.subscription.seatQuantity} /></label><button type="submit">Update seats</button></form></Panel>}</div>;
+}
+function IntegrationsPanel({ workspaceId, exports, endpoints, deliveries, request, refresh }: { workspaceId: string; exports: ExportJob[]; endpoints: WebhookEndpoint[]; deliveries: WebhookDelivery[]; request: <T>(path: string, init?: RequestInit) => Promise<T>; refresh: () => Promise<void> }) {
+  return <div className="grid"><Panel title="Exports"><p className="muted">Generate versioned evidence in CSV or JSON. Downloads expire after 24 hours.</p><div className="actions"><button onClick={() => void request('/v1/exports', { method: 'POST', body: JSON.stringify({ workspaceId, format: 'csv', scope: 'all' }) }).then(refresh)}>Create CSV</button><button className="secondary" onClick={() => void request('/v1/exports', { method: 'POST', body: JSON.stringify({ workspaceId, format: 'json', scope: 'all' }) }).then(refresh)}>Create JSON</button></div><table><thead><tr><th>Format</th><th>Status</th><th>Rows</th><th>File</th></tr></thead><tbody>{exports.map((job) => <tr key={job.id}><td>{job.format}</td><td><Status value={job.status} /></td><td>{job.rowCount ?? '—'}</td><td>{job.downloadUrl ? <a href={job.downloadUrl}>Download</a> : '—'}</td></tr>)}</tbody></table></Panel><Panel title="Add signed webhook"><form onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); void request<{ signingSecret: string }>('/v1/webhook-endpoints', { method: 'POST', body: JSON.stringify({ workspaceId, url: form.get('url'), eventTypes: String(form.get('events')).split(',').map((item) => item.trim()) }) }).then((result) => { window.alert(`Save this signing secret now: ${result.signingSecret}`); return refresh(); }); }}><label>HTTPS destination<input name="url" type="url" required placeholder="https://example.com/hooks/voiceforge" /></label><label>Event actions<input name="events" required defaultValue="time_entry.approved,safety_report.acknowledged,job.updated" /></label><button type="submit">Create endpoint</button></form></Panel><Panel title="Webhook endpoints"><table><thead><tr><th>URL</th><th>Events</th><th>Status</th></tr></thead><tbody>{endpoints.map((endpoint) => <tr key={endpoint.id}><td>{endpoint.url}</td><td>{endpoint.eventTypes.join(', ')}</td><td><Status value={endpoint.enabled ? 'active' : 'disabled'} /></td></tr>)}</tbody></table></Panel><Panel title="Recent deliveries"><table><thead><tr><th>Event</th><th>Status</th><th>Attempts</th><th>Action</th></tr></thead><tbody>{deliveries.slice(0, 20).map((delivery) => <tr key={delivery.id}><td>{delivery.eventType}</td><td><Status value={delivery.status} /></td><td>{delivery.attemptCount}</td><td>{delivery.status === 'dead_letter' && <button onClick={() => void request(`/v1/webhook-deliveries/${delivery.id}/replay`, { method: 'POST', body: JSON.stringify({ workspaceId }) }).then(refresh)}>Replay</button>}</td></tr>)}</tbody></table></Panel></div>;
 }

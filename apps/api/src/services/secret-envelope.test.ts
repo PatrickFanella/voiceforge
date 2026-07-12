@@ -1,0 +1,2 @@
+import { describe, expect, it } from 'vitest'; import { decryptSecret, encryptSecret } from './secret-envelope.js';
+describe('secret envelopes', () => { it('encrypts webhook signing secrets with authenticated encryption', () => { const encrypted = encryptSecret('whsec_value', 'master'); expect(encrypted).not.toContain('whsec_value'); expect(decryptSecret(encrypted, 'master')).toBe('whsec_value'); expect(() => decryptSecret(encrypted, 'wrong')).toThrow(); }); });

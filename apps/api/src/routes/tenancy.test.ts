@@ -129,7 +129,7 @@ describe('identity and tenancy routes', () => {
     const updated = await app.inject({ method: 'PATCH', url: `/v1/workspaces/${teamId}/memberships/${userId}`, headers: authHeaders, payload: { workspaceId: teamId, role: 'worker' } });
     expect(listed.statusCode).toBe(200);
     expect(updated.statusCode).toBe(200);
-    expect(store.updateMemberRole).toHaveBeenCalledWith({ workspaceId: teamId, userId, role: 'worker' });
+    expect(store.updateMemberRole).toHaveBeenCalledWith({ workspaceId: teamId, userId, role: 'worker', actorUserId: userId });
     await app.close();
   });
 });

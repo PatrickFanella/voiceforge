@@ -7,3 +7,4 @@ export * from './transcription-repository.js';
 export * from './time-repository.js';
 export * from './safety-repository.js';
 export * from './billing-repository.js';
+export * from './integration-repository.js';

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import type { VoiceForgeDatabase } from './client.js';
-import { identities, invitations, users, workspaceMemberships, workspaces } from './schema.js';
+import { auditEvents, identities, invitations, users, workspaceMemberships, workspaces } from './schema.js';
 
 export interface ExternalIdentity {
   subject: string;
@@ -76,6 +76,7 @@ export class TenancyRepository {
       const id = crypto.randomUUID();
       await tx.insert(workspaces).values({ id, kind: 'team', name: input.name, timeZone: input.timeZone });
       await tx.insert(workspaceMemberships).values({ workspaceId: id, userId, role: 'owner', status: 'active', joinedAt: new Date() });
+      await recordMembershipAudit(tx, id, userId, 'membership.owner_created', userId, { role: 'owner' });
       return { id, kind: 'team', name: input.name, timeZone: input.timeZone, role: 'owner' };
     });
   }
@@ -95,10 +96,7 @@ export class TenancyRepository {
     const id = crypto.randomUUID();
     const token = `${crypto.randomUUID()}${crypto.randomUUID()}`.replaceAll('-', '');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await this.db.insert(invitations).values({
-      id, workspaceId: input.workspaceId, email: input.email.toLowerCase(), role: input.role,
-      tokenDigest: createHash('sha256').update(token).digest('hex'), invitedBy: input.invitedBy, expiresAt,
-    });
+    await this.db.transaction(async (tx) => { await tx.insert(invitations).values({ id, workspaceId: input.workspaceId, email: input.email.toLowerCase(), role: input.role, tokenDigest: createHash('sha256').update(token).digest('hex'), invitedBy: input.invitedBy, expiresAt }); await recordMembershipAudit(tx, input.workspaceId, input.invitedBy, 'membership.invited', null, { invitationId: id, role: input.role }); });
     return { id, workspaceId: input.workspaceId, email: input.email.toLowerCase(), role: input.role, status: 'pending' as const, expiresAt: expiresAt.toISOString(), token };
   }
 
@@ -127,6 +125,7 @@ export class TenancyRepository {
         .where(and(eq(workspaceMemberships.userId, input.userId), eq(workspaceMemberships.workspaceId, invitation.workspaceId)))
         .limit(1);
       if (!access) throw new Error('Accepted membership was not persisted.');
+      await recordMembershipAudit(tx, invitation.workspaceId, input.userId, 'membership.accepted', input.userId, { role: invitation.role });
       return access;
     });
   }
@@ -146,7 +145,7 @@ export class TenancyRepository {
     }).from(invitations).where(eq(invitations.workspaceId, workspaceId)).orderBy(invitations.createdAt);
   }
 
-  async updateMemberRole(input: { workspaceId: string; userId: string; role: WorkspaceAccess['role'] }) {
+  async updateMemberRole(input: { workspaceId: string; userId: string; role: WorkspaceAccess['role']; actorUserId?: string }) {
     return this.db.transaction(async (tx) => {
       const [member] = await tx.select().from(workspaceMemberships).where(and(
         eq(workspaceMemberships.workspaceId, input.workspaceId), eq(workspaceMemberships.userId, input.userId),
@@ -156,11 +155,12 @@ export class TenancyRepository {
       const [updated] = await tx.update(workspaceMemberships).set({ role: input.role, updatedAt: new Date() })
         .where(and(eq(workspaceMemberships.workspaceId, input.workspaceId), eq(workspaceMemberships.userId, input.userId)))
         .returning();
+      await recordMembershipAudit(tx, input.workspaceId, input.actorUserId ?? null, 'membership.role_updated', input.userId, { previousRole: member.role, role: input.role });
       return updated!;
     });
   }
 
-  async removeMember(input: { workspaceId: string; userId: string }) {
+  async removeMember(input: { workspaceId: string; userId: string; actorUserId?: string }) {
     await this.db.transaction(async (tx) => {
       const [member] = await tx.select().from(workspaceMemberships).where(and(
         eq(workspaceMemberships.workspaceId, input.workspaceId), eq(workspaceMemberships.userId, input.userId),
@@ -169,6 +169,7 @@ export class TenancyRepository {
       if (member.role === 'owner') await ensureAnotherOwner(tx, input.workspaceId, input.userId);
       await tx.update(workspaceMemberships).set({ status: 'removed', updatedAt: new Date() })
         .where(and(eq(workspaceMemberships.workspaceId, input.workspaceId), eq(workspaceMemberships.userId, input.userId)));
+      await recordMembershipAudit(tx, input.workspaceId, input.actorUserId ?? null, 'membership.removed', input.userId, { role: member.role });
     });
   }
 }
@@ -179,4 +180,12 @@ type Transaction = Parameters<Parameters<VoiceForgeDatabase['transaction']>[0]>[
 async function ensureAnotherOwner(tx: Transaction, workspaceId: string, excludingUserId: string) {
   const rows = await tx.execute(sql`select count(*)::int as count from workspace_memberships where workspace_id = ${workspaceId} and role = 'owner' and status = 'active' and user_id <> ${excludingUserId}`);
   if (Number(rows[0]?.count ?? 0) < 1) throw new Error('A workspace must retain at least one owner.');
+}
+
+async function recordMembershipAudit(tx: Transaction, workspaceId: string, actorUserId: string | null, action: string, entityId: string | null, details: Record<string, unknown>) {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`audit:${workspaceId}`}, 0))`);
+  const [workspace] = await tx.update(workspaces).set({ currentChangeSequence: sql`${workspaces.currentChangeSequence} + 1`, updatedAt: new Date() }).where(eq(workspaces.id, workspaceId)).returning({ sequence: workspaces.currentChangeSequence });
+  if (!workspace) throw new Error('Workspace not found.'); const [previous] = await tx.select({ eventHash: auditEvents.eventHash }).from(auditEvents).where(eq(auditEvents.workspaceId, workspaceId)).orderBy(desc(auditEvents.sequence)).limit(1);
+  const evidence = { workspaceId, sequence: workspace.sequence, actorUserId, action, entityType: 'membership', entityId, details }; const eventHash = createHash('sha256').update(JSON.stringify({ previousHash: previous?.eventHash ?? null, ...evidence })).digest('hex');
+  await tx.insert(auditEvents).values({ id: crypto.randomUUID(), workspaceId, sequence: workspace.sequence, actorUserId, action, entityType: 'membership', entityId, details, previousHash: previous?.eventHash, eventHash });
 }

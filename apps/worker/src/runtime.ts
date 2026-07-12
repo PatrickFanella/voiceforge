@@ -1,4 +1,15 @@
+import { createDecipheriv, createHash, createHmac } from 'node:crypto';
 import type { ConnectionOptions, JobsOptions } from 'bullmq';
+
+export const webhookRetryDelay = (attempt: number) => Math.min(3_600_000, 1_000 * 2 ** attempt);
+export const createWebhookSignature = (secret: string, timestamp: number, payload: string) => `t=${timestamp},v1=${createHmac('sha256', secret).update(`${timestamp}.${payload}`).digest('hex')}`;
+export function decryptSecretEnvelope(value: string, masterKey: string) { const [iv, tag, encrypted] = value.split('.'); if (!iv || !tag || !encrypted) throw new Error('Invalid secret envelope.'); const decipher = createDecipheriv('aes-256-gcm', createHash('sha256').update(masterKey).digest(), Buffer.from(iv, 'base64url')); decipher.setAuthTag(Buffer.from(tag, 'base64url')); return Buffer.concat([decipher.update(Buffer.from(encrypted, 'base64url')), decipher.final()]).toString('utf8'); }
+export function exportRowsToCsv(rows: Record<string, unknown>[]) {
+  if (!rows.length) return '';
+  const headers = [...new Set(rows.flatMap((row) => Object.keys(row)))];
+  const cell = (value: unknown) => { const text = value == null ? '' : String(value); return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text; };
+  return `${headers.join(',')}\n${rows.map((row) => headers.map((header) => cell(row[header])).join(',')).join('\n')}\n`;
+}
 
 export function parseRedisConnection(value: string): ConnectionOptions {
   const url = new URL(value);

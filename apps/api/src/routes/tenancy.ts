@@ -106,7 +106,7 @@ export async function registerTenancyRoutes(app: FastifyInstance, dependencies: 
     const target = (await dependencies.store.listMembers(access.id)).find((member) => member.userId === request.params.userId);
     if (!target) throw new AuthorizationError('membership:manage');
     if (access.role === 'admin' && (target.role === 'owner' || target.role === 'admin' || request.body.role === 'owner' || request.body.role === 'admin')) throw new AuthorizationError('membership:manage');
-    return dependencies.store.updateMemberRole({ workspaceId: access.id, userId: request.params.userId, role: request.body.role });
+    return dependencies.store.updateMemberRole({ workspaceId: access.id, userId: request.params.userId, role: request.body.role, actorUserId: session.user.id });
   });
 
   app.delete<{ Headers: { 'idempotency-key': string }; Params: { workspaceId: string; userId: string } }>('/v1/workspaces/:workspaceId/memberships/:userId', {
@@ -118,7 +118,7 @@ export async function registerTenancyRoutes(app: FastifyInstance, dependencies: 
     requirePermission(access.role, 'membership:manage', access.kind);
     const target = (await dependencies.store.listMembers(access.id)).find((member) => member.userId === request.params.userId);
     if (!target || (access.role === 'admin' && (target.role === 'owner' || target.role === 'admin'))) throw new AuthorizationError('membership:manage');
-    await dependencies.store.removeMember({ workspaceId: access.id, userId: request.params.userId });
+    await dependencies.store.removeMember({ workspaceId: access.id, userId: request.params.userId, actorUserId: session.user.id });
     return reply.code(204).send();
   });
 }

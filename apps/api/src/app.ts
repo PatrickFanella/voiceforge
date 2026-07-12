@@ -21,6 +21,8 @@ import { registerSafetyRoutes, type SafetyQueue } from './routes/safety.js';
 import rawBody from 'fastify-raw-body';
 import { registerBillingRoutes, type StripeGateway } from './routes/billing.js';
 import type { BillingRepository } from '@voiceforge/database';
+import type { IntegrationRepository } from '@voiceforge/database';
+import { registerIntegrationRoutes, type ExportQueue, type ExportStorage } from './routes/integrations.js';
 
 export interface AppDependencies {
   verifier: TokenVerifier;
@@ -39,6 +41,7 @@ export interface AppDependencies {
     queue: SafetyQueue;
   };
   billing?: { repository: Pick<BillingRepository, 'get' | 'saveCustomer' | 'findCustomer' | 'setPendingSeatQuantity' | 'reconcile'>; stripe: StripeGateway };
+  integrations?: { repository: Pick<IntegrationRepository, 'createExport' | 'getExport' | 'listExports' | 'createEndpoint' | 'listEndpoints' | 'listDeliveries' | 'setEndpointEnabled' | 'replayDelivery'>; exportQueue: ExportQueue; exportStorage: ExportStorage; secretKey: string };
 }
 
 export async function buildApp(dependencies?: AppDependencies) {
@@ -94,6 +97,7 @@ export async function buildApp(dependencies?: AppDependencies) {
     if (dependencies.time) await registerTimeRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, repository: dependencies.time });
     if (dependencies.safety) await registerSafetyRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, ...dependencies.safety });
     if (dependencies.billing) await registerBillingRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, ...dependencies.billing });
+    if (dependencies.integrations) await registerIntegrationRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, ...dependencies.integrations });
   }
 
   app.setNotFoundHandler((request, reply) => reply.code(404).send({

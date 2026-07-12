@@ -43,6 +43,13 @@
       "when": 1783876858299,
       "tag": "0005_kind_agent_zero",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783877392427,
+      "tag": "0006_sticky_cloak",
+      "breakpoints": true
     }
   ]
 }
