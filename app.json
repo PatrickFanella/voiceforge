@@ -36,7 +36,15 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "VoiceForge uses the microphone only when you choose to record a field note.",
+          "recordAudioAndroid": true,
+          "enableBackgroundRecording": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

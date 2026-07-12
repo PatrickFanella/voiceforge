@@ -35,6 +35,7 @@ function RootLayoutNav() {
           headerShown: false,
         }}
       />
+      <Stack.Screen name="voice-review" options={{ headerShown: false }} />
     </Stack>
   );
 }

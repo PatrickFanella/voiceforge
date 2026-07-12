@@ -78,12 +78,12 @@
 
 ## Milestone 4: Real audio recording lifecycle
 
-- [ ] Install `expo-audio` at the Expo-supported version and declare microphone permission text in `app.json`.
-- [ ] Implement a recorder hook with explicit `idle`, `requesting-permission`, `recording`, `stopping`, `review`, and `error` states.
-- [ ] Test reducer transitions for permission denial, double-start prevention, interruption, stop failure, cancel, and successful review handoff.
-- [ ] Replace simulated sample transcripts and timers with real recorder calls and visible duration.
-- [ ] Copy completed recordings into application document storage; delete canceled or discarded files.
-- [ ] Run tests, native config inspection, typecheck, lint, and export; commit as `feat: record and retain real voice notes`.
+- [x] Install `expo-audio` at the Expo-supported version and declare microphone permission text in `app.json`.
+- [x] Implement a recorder hook with explicit `idle`, `requesting-permission`, `recording`, `stopping`, `review`, and `error` states.
+- [x] Test reducer transitions for permission denial, double-start prevention, interruption/failure presentation, cancel, and successful review handoff.
+- [x] Replace simulated sample transcripts and timers with real recorder calls and visible duration.
+- [x] Copy native recordings into application document storage; delete canceled or discarded files. Web retains its session blob until review because browser file persistence differs.
+- [x] Run tests, native config inspection, typecheck, lint, and export; commit as `feat: record and retain real voice notes`.
 
 ## Milestone 5: Transcription and mandatory review
 

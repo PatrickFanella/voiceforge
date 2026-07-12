@@ -1,414 +1,123 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CheckCircle, Mic, MicOff, RotateCcw, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { Mic, MicOff, X, Waves, CheckCircle } from 'lucide-react-native';
-import { Colors } from '@/constants/colors';
-import { useApp } from '@/providers/AppProvider';
-import * as Haptics from 'expo-haptics';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const SAMPLE_TRANSCRIPTS = [
-  "Clocking in at the Henderson job site. Starting EV charger install, running conduit from panel to garage.",
-  "Safety check done. All PPE verified. Lockout tagout confirmed on main breaker before starting work.",
-  "Need to order 100 feet of 6/3 Romex and a 50-amp GFCI breaker for the charger install tomorrow.",
-  "Finished pulling wire through conduit. Taking a break. Will mount the charger unit after lunch.",
-];
+import { Colors } from '@/constants/colors';
+import { useVoiceRecorder } from '@/features/voice/useVoiceRecorder';
+import { useApp } from '@/providers/AppProvider';
+
+function formatDuration(durationMillis: number): string {
+  const seconds = Math.floor(durationMillis / 1000);
+  const minutes = Math.floor(seconds / 60);
+  return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+}
 
 export default function VoiceScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { addVoiceLog, activeJob } = useApp();
+  const { activeJob } = useApp();
+  const recorder = useVoiceRecorder();
+  const { phase } = recorder.state;
 
-  const [recording, setRecording] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const [processing, setProcessing] = useState(false);
-  const [done, setDone] = useState(false);
-
-  const ring1 = useRef(new Animated.Value(0)).current;
-  const ring2 = useRef(new Animated.Value(0)).current;
-  const ring3 = useRef(new Animated.Value(0)).current;
-  const fadeIn = useRef(new Animated.Value(0)).current;
-  const doneScale = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(fadeIn, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
-  }, [fadeIn]);
-
-  useEffect(() => {
-    if (!recording) return;
-
-    const createRingAnimation = (anim: Animated.Value, delay: number) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.parallel([
-            Animated.timing(anim, {
-              toValue: 1,
-              duration: 2000,
-              useNativeDriver: true,
-            }),
-          ]),
-          Animated.timing(anim, {
-            toValue: 0,
-            duration: 0,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-
-    const a1 = createRingAnimation(ring1, 0);
-    const a2 = createRingAnimation(ring2, 600);
-    const a3 = createRingAnimation(ring3, 1200);
-
-    a1.start();
-    a2.start();
-    a3.start();
-
-    return () => {
-      a1.stop();
-      a2.stop();
-      a3.stop();
-      ring1.setValue(0);
-      ring2.setValue(0);
-      ring3.setValue(0);
-    };
-  }, [recording, ring1, ring2, ring3]);
-
-  const startRecording = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    setRecording(true);
-    setTranscript('');
-    setDone(false);
-
-    const randomTranscript = SAMPLE_TRANSCRIPTS[Math.floor(Math.random() * SAMPLE_TRANSCRIPTS.length)];
-    let charIndex = 0;
-
-    const interval = setInterval(() => {
-      if (charIndex < randomTranscript.length) {
-        setTranscript(randomTranscript.slice(0, charIndex + 1));
-        charIndex++;
-      }
-    }, 35);
-
-    setTimeout(() => {
-      clearInterval(interval);
-      setTranscript(randomTranscript);
-    }, randomTranscript.length * 35 + 100);
-  }, []);
-
-  const stopRecording = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setRecording(false);
-    setProcessing(true);
-
-    setTimeout(() => {
-      setProcessing(false);
-      setDone(true);
-
-      Animated.spring(doneScale, {
-        toValue: 1,
-        friction: 5,
-        tension: 100,
-        useNativeDriver: true,
-      }).start();
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-      const categories: ('time' | 'safety' | 'materials' | 'note')[] = ['time', 'safety', 'materials', 'note'];
-      addVoiceLog({
-        id: `v-${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        transcript: transcript || 'Voice log recorded',
-        category: categories[Math.floor(Math.random() * categories.length)],
-        processed: true,
-        jobId: activeJob?.id,
-      });
-    }, 1500);
-  }, [transcript, addVoiceLog, activeJob, doneScale]);
-
-  const handleClose = useCallback(() => {
-    Haptics.selectionAsync();
+  const close = async () => {
+    if (phase === 'recording' || phase === 'review') await recorder.cancel();
     router.back();
-  }, [router]);
-
-  const renderRing = (anim: Animated.Value, size: number) => {
-    const scale = anim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [1, size / 80],
-    });
-    const opacity = anim.interpolate({
-      inputRange: [0, 0.5, 1],
-      outputRange: [0.4, 0.15, 0],
-    });
-
-    return (
-      <Animated.View
-        style={[
-          styles.ring,
-          {
-            width: 80,
-            height: 80,
-            borderRadius: 40,
-            transform: [{ scale }],
-            opacity,
-          },
-        ]}
-      />
-    );
   };
 
   return (
-    <Animated.View style={[styles.container, { paddingTop: insets.top, opacity: fadeIn }]}>
+    <View style={[styles.container, { paddingTop: insets.top }]}> 
       <View style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.closeBtn}
-          onPress={handleClose}
-          testID="close-voice"
-        >
-          <X size={22} color={Colors.dark.text} />
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close voice recorder" style={styles.close} onPress={() => void close()}>
+          <X color={Colors.dark.text} size={22} />
         </TouchableOpacity>
-        <Text style={styles.topTitle}>Voice Capture</Text>
-        <View style={{ width: 40 }} />
+        <Text style={styles.heading}>Voice capture</Text>
+        <View style={styles.close} />
       </View>
 
-      {activeJob && (
-        <View style={styles.jobContext}>
-          <View style={styles.jobContextDot} />
-          <Text style={styles.jobContextText}>{activeJob.title}</Text>
-        </View>
-      )}
+      <View style={styles.jobPill}>
+        <View style={styles.dot} />
+        <Text style={styles.jobText}>{activeJob?.title ?? 'No active job'}</Text>
+      </View>
 
       <View style={styles.center}>
-        {done ? (
-          <Animated.View style={[styles.doneContainer, { transform: [{ scale: doneScale }] }]}>
-            <View style={styles.doneCircle}>
-              <CheckCircle size={48} color={Colors.dark.success} />
-            </View>
-            <Text style={styles.doneTitle}>Logged</Text>
-            <Text style={styles.doneSubtitle}>Processing complete</Text>
-          </Animated.View>
+        {phase === 'review' ? (
+          <View style={styles.result}>
+            <CheckCircle color={Colors.dark.success} size={58} />
+            <Text style={styles.resultTitle}>Recording saved</Text>
+            <Text style={styles.resultBody}>The audio is retained locally and ready for transcript review.</Text>
+          </View>
         ) : (
-          <View style={styles.micArea}>
-            {recording && renderRing(ring1, 200)}
-            {recording && renderRing(ring2, 260)}
-            {recording && renderRing(ring3, 320)}
+          <>
             <TouchableOpacity
-              style={[
-                styles.micButton,
-                recording && styles.micButtonActive,
-                processing && styles.micButtonProcessing,
-              ]}
-              onPress={recording ? stopRecording : startRecording}
-              activeOpacity={0.85}
-              disabled={processing}
-              testID="mic-button"
+              accessibilityRole="button"
+              accessibilityLabel={phase === 'recording' ? 'Stop recording' : 'Start recording'}
+              disabled={phase === 'requesting-permission' || phase === 'stopping'}
+              style={[styles.recordButton, phase === 'recording' && styles.recording]}
+              onPress={() => void (phase === 'recording' ? recorder.stop() : recorder.start())}
             >
-              {processing ? (
-                <Waves size={36} color="#fff" />
-              ) : recording ? (
-                <MicOff size={36} color="#fff" />
+              {phase === 'requesting-permission' || phase === 'stopping' ? (
+                <ActivityIndicator color="#fff" size="large" />
+              ) : phase === 'recording' ? (
+                <MicOff color="#fff" size={38} />
               ) : (
-                <Mic size={36} color="#fff" />
+                <Mic color="#fff" size={38} />
               )}
             </TouchableOpacity>
-          </View>
+            <Text style={styles.duration}>{formatDuration(recorder.durationMillis)}</Text>
+            <Text style={styles.prompt}>
+              {phase === 'recording' ? 'Recording locally — tap to stop' : phase === 'error' ? recorder.state.error : 'Tap the microphone to begin'}
+            </Text>
+          </>
         )}
       </View>
 
-      <View style={styles.transcriptArea}>
-        {transcript ? (
-          <View style={styles.transcriptBox}>
-            <Text style={styles.transcriptLabel}>
-              {processing ? 'Processing with on-device AI...' : recording ? 'Listening...' : 'Transcript'}
-            </Text>
-            <Text style={styles.transcriptText}>{transcript}</Text>
-          </View>
-        ) : (
-          <View style={styles.hintBox}>
-            <Mic size={18} color={Colors.dark.textMuted} />
-            <Text style={styles.hintText}>
-              {recording ? 'Speak naturally — logging in progress' : 'Tap the mic to start a voice log'}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {done && (
-        <TouchableOpacity
-          style={styles.newLogBtn}
-          onPress={() => {
-            setDone(false);
-            setTranscript('');
-            doneScale.setValue(0);
-          }}
-        >
-          <Text style={styles.newLogText}>New Voice Log</Text>
+      {phase === 'error' ? (
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Try recording again" style={styles.secondaryButton} onPress={recorder.reset}>
+          <RotateCcw color={Colors.dark.accent} size={17} />
+          <Text style={styles.secondaryText}>Try again</Text>
         </TouchableOpacity>
-      )}
+      ) : null}
 
-      <View style={{ height: insets.bottom + 20 }} />
-    </Animated.View>
+      {phase === 'review' ? (
+        <View style={styles.reviewActions}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Discard recording" style={styles.secondaryButton} onPress={() => void recorder.cancel()}>
+            <Text style={styles.secondaryText}>Discard</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Continue to transcript review"
+            style={styles.primaryButton}
+            onPress={() => router.replace({ pathname: '/voice-review', params: { audioUri: recorder.state.audioUri ?? '' } } as never)}
+          >
+            <Text style={styles.primaryText}>Review transcript</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      <View style={{ height: insets.bottom + 18 }} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  closeBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.dark.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topTitle: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: Colors.dark.text,
-  },
-  jobContext: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  jobContextDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.dark.success,
-  },
-  jobContextText: {
-    fontSize: 13,
-    color: Colors.dark.textSecondary,
-    fontWeight: '500' as const,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  micArea: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 320,
-    height: 320,
-  },
-  ring: {
-    position: 'absolute',
-    backgroundColor: Colors.dark.accent,
-  },
-  micButton: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: Colors.dark.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Colors.dark.accent,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
-    zIndex: 10,
-  },
-  micButtonActive: {
-    backgroundColor: Colors.dark.danger,
-    shadowColor: Colors.dark.danger,
-  },
-  micButtonProcessing: {
-    backgroundColor: Colors.dark.info,
-    shadowColor: Colors.dark.info,
-  },
-  doneContainer: {
-    alignItems: 'center',
-    gap: 12,
-  },
-  doneCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: Colors.dark.successDim,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  doneTitle: {
-    fontSize: 24,
-    fontWeight: '700' as const,
-    color: Colors.dark.text,
-  },
-  doneSubtitle: {
-    fontSize: 14,
-    color: Colors.dark.textSecondary,
-  },
-  transcriptArea: {
-    paddingHorizontal: 24,
-    marginBottom: 16,
-  },
-  transcriptBox: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  transcriptLabel: {
-    fontSize: 11,
-    color: Colors.dark.accent,
-    fontWeight: '600' as const,
-    letterSpacing: 0.5,
-    marginBottom: 8,
-    textTransform: 'uppercase' as const,
-  },
-  transcriptText: {
-    fontSize: 15,
-    color: Colors.dark.text,
-    lineHeight: 22,
-  },
-  hintBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 16,
-  },
-  hintText: {
-    fontSize: 14,
-    color: Colors.dark.textMuted,
-  },
-  newLogBtn: {
-    marginHorizontal: 24,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  newLogText: {
-    fontSize: 15,
-    fontWeight: '600' as const,
-    color: Colors.dark.accent,
-  },
+  container: { flex: 1, backgroundColor: Colors.dark.background },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
+  close: { width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.dark.surface, alignItems: 'center', justifyContent: 'center' },
+  heading: { color: Colors.dark.text, fontSize: 17, fontWeight: '700' },
+  jobPill: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: Colors.dark.surface, borderRadius: 18, paddingHorizontal: 13, paddingVertical: 7 },
+  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.dark.success },
+  jobText: { color: Colors.dark.textSecondary, fontSize: 12, fontWeight: '600' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
+  recordButton: { width: 112, height: 112, borderRadius: 56, backgroundColor: Colors.dark.accent, alignItems: 'center', justifyContent: 'center' },
+  recording: { backgroundColor: Colors.dark.danger },
+  duration: { color: Colors.dark.text, fontSize: 34, fontWeight: '300', fontVariant: ['tabular-nums'], marginTop: 28 },
+  prompt: { color: Colors.dark.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 10, maxWidth: 280 },
+  result: { alignItems: 'center', maxWidth: 290 },
+  resultTitle: { color: Colors.dark.text, fontSize: 24, fontWeight: '700', marginTop: 18 },
+  resultBody: { color: Colors.dark.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 8 },
+  reviewActions: { flexDirection: 'row', gap: 10, paddingHorizontal: 20 },
+  secondaryButton: { minHeight: 50, flex: 1, borderRadius: 13, borderColor: Colors.dark.border, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, marginHorizontal: 20 },
+  secondaryText: { color: Colors.dark.accent, fontSize: 14, fontWeight: '700' },
+  primaryButton: { minHeight: 50, flex: 2, borderRadius: 13, backgroundColor: Colors.dark.accent, alignItems: 'center', justifyContent: 'center' },
+  primaryText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });
