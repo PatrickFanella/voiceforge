@@ -26,7 +26,7 @@ const app = await buildApp({
   },
   billing: { repository: { get: unavailable, saveCustomer: unavailable, findCustomer: unavailable, setPendingSeatQuantity: unavailable, reconcile: unavailable }, stripe: { createCustomer: unavailable, createCheckout: unavailable, createPortal: unavailable, updateSeats: unavailable, parseWebhook: unavailable } },
   integrations: { repository: { createExport: unavailable, getExport: unavailable, listExports: unavailable, createEndpoint: unavailable, listEndpoints: unavailable, listDeliveries: unavailable, setEndpointEnabled: unavailable, replayDelivery: unavailable }, exportQueue: { enqueue: unavailable }, exportStorage: { signDownload: unavailable }, secretKey: 'openapi-generation-secret' },
-  governance: { repository: { getPolicy: unavailable, configurePolicy: unavailable, createHold: unavailable, listHolds: unavailable, releaseHold: unavailable, createSubjectRequest: unavailable, getSubjectRequest: unavailable, validateAuditChain: unavailable }, queue: { enqueue: unavailable }, storage: { signDownload: unavailable } },
+  governance: { repository: { getPolicy: unavailable, configurePolicy: unavailable, createHold: unavailable, listHolds: unavailable, releaseHold: unavailable, searchAuditEvents: unavailable, createSubjectRequest: unavailable, getSubjectRequest: unavailable, validateAuditChain: unavailable }, queue: { enqueue: unavailable }, storage: { signDownload: unavailable } },
 });
 await app.ready();
 await writeFile(new URL('../openapi.json', import.meta.url), `${JSON.stringify(app.swagger(), null, 2)}\n`);

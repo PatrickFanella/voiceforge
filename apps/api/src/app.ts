@@ -45,7 +45,7 @@ export interface AppDependencies {
   };
   billing?: { repository: Pick<BillingRepository, 'get' | 'saveCustomer' | 'findCustomer' | 'setPendingSeatQuantity' | 'reconcile'>; stripe: StripeGateway };
   integrations?: { repository: Pick<IntegrationRepository, 'createExport' | 'getExport' | 'listExports' | 'createEndpoint' | 'listEndpoints' | 'listDeliveries' | 'setEndpointEnabled' | 'replayDelivery'>; exportQueue: ExportQueue; exportStorage: ExportStorage; secretKey: string };
-  governance?: { repository: Pick<GovernanceRepository, 'getPolicy' | 'configurePolicy' | 'createHold' | 'listHolds' | 'releaseHold' | 'createSubjectRequest' | 'getSubjectRequest' | 'validateAuditChain'>; queue: SubjectQueue; storage: SubjectStorage };
+  governance?: { repository: Pick<GovernanceRepository, 'getPolicy' | 'configurePolicy' | 'createHold' | 'listHolds' | 'releaseHold' | 'searchAuditEvents' | 'createSubjectRequest' | 'getSubjectRequest' | 'validateAuditChain'>; queue: SubjectQueue; storage: SubjectStorage };
 }
 
 export async function buildApp(dependencies?: AppDependencies) {

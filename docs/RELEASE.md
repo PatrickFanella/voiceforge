@@ -15,6 +15,8 @@ bunx expo-doctor
 
 Confirm the working tree is clean, review dependency changes, and complete the native manual matrix in `docs/TESTING.md`.
 
+For a backend or coordinated production release, use `infra/scripts/acceptance-audit.sh` and satisfy every applicable gate in `docs/PRODUCTION_ACCEPTANCE.md`. A successful local build alone does not authorize production enforcement.
+
 ## Build
 
 ```bash
