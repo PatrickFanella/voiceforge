@@ -62,3 +62,13 @@ export interface WorkerProfile {
   jobsCompleted: number;
   safetyScore: number;
 }
+
+export interface AuditEvent {
+  id: string;
+  entityType: 'job' | 'time_entry' | 'safety_report' | 'voice_log' | 'setting';
+  entityId: string;
+  action: 'created' | 'updated' | 'deleted' | 'confirmed';
+  sourceVoiceLogId?: string;
+  occurredAt: string;
+  details: Record<string, unknown>;
+}

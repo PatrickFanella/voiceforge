@@ -1,5 +1,6 @@
 import { Clock, Mic, ShieldAlert, Wrench } from 'lucide-react-native';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import VoiceButton from '@/components/VoiceButton';
@@ -9,6 +10,7 @@ import { useApp } from '@/providers/AppProvider';
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const app = useApp();
 
   if (!app.ready || app.loadError) {
@@ -16,6 +18,22 @@ export default function DashboardScreen() {
   }
 
   const unresolvedSafety = app.safetyReports.filter((report) => !report.resolved).length;
+
+  const handleClock = async () => {
+    if (app.clockedIn) {
+      router.push('/clock-out' as never);
+      return;
+    }
+    if (!app.activeJob) {
+      Alert.alert('Select an active job', 'Choose a job before clocking in.');
+      return;
+    }
+    try {
+      await app.startClock(app.activeJob.id);
+    } catch (error) {
+      Alert.alert('Could not clock in', error instanceof Error ? error.message : 'Try again.');
+    }
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}> 
@@ -36,7 +54,7 @@ export default function DashboardScreen() {
           accessibilityRole="button"
           accessibilityLabel={app.clockedIn ? 'Clock out' : 'Clock in'}
           style={[styles.clockButton, app.clockedIn && styles.clockedIn]}
-          onPress={() => void app.toggleClock()}
+          onPress={() => void handleClock()}
         >
           <Clock color="#fff" size={22} />
           <Text style={styles.clockText}>{app.clockedIn ? 'Clock out' : 'Clock in'}</Text>

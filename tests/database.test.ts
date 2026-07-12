@@ -81,7 +81,7 @@ describe('VoiceForge database', () => {
     });
 
     const snapshot = await repository.exportSnapshot();
-    expect(snapshot.schemaVersion).toBe(1);
+    expect(snapshot.schemaVersion).toBe(2);
     expect(snapshot.jobs).toHaveLength(mockJobs.length);
     expect(snapshot.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
@@ -91,5 +91,55 @@ describe('VoiceForge database', () => {
     expect(await repository.getSafetyReports()).toEqual([]);
     expect(await repository.getVoiceLogs()).toEqual([]);
     expect(await repository.getSetting('demo_seeded', false)).toBe(true);
+  });
+
+  it('requires confirmation and audits voice-derived consequential records', async () => {
+    await repository.seedDemoData({ jobs: mockJobs, timeEntries: [], safetyReports: [], voiceLogs: mockVoiceLogs });
+    const entry = {
+      id: 'time-confirmed', jobId: 'j1', jobTitle: mockJobs[0].title, date: '2026-07-12',
+      startTime: '08:00', endTime: '09:00', hours: 1, type: 'regular' as const,
+      notes: 'Voice-derived time', voiceLogged: true, sourceVoiceLogId: 'v1',
+    };
+
+    await expect(repository.addTimeEntry(entry)).rejects.toThrow('Explicit confirmation');
+    await repository.addTimeEntry(entry, true);
+    expect(await repository.getTimeEntries()).toContainEqual(entry);
+    expect(await repository.getAuditEvents()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ entityType: 'time_entry', entityId: entry.id, action: 'confirmed', sourceVoiceLogId: 'v1' }),
+    ]));
+  });
+
+  it('creates, updates, and deletes safety reports with audit history', async () => {
+    await repository.seedDemoData({ jobs: mockJobs, timeEntries: [], safetyReports: [], voiceLogs: mockVoiceLogs });
+    const report = {
+      id: 'safety-confirmed', jobId: 'j1', jobTitle: mockJobs[0].title, date: '2026-07-12',
+      type: 'hazard' as const, severity: 'high' as const, description: 'Exposed live wire',
+      resolved: false, voiceLogged: true, sourceVoiceLogId: 'v2',
+    };
+    await repository.addSafetyReport(report, true);
+    await repository.updateSafetyReport({ ...report, resolved: true });
+    await repository.deleteRecord('safety_report', report.id);
+
+    expect(await repository.getSafetyReports()).toEqual([]);
+    expect((await repository.getAuditEvents()).filter((event) => event.entityId === report.id).map((event) => event.action)).toEqual(
+      expect.arrayContaining(['confirmed', 'updated', 'deleted']),
+    );
+  });
+
+  it('atomically completes clock-out and records its source in audit details', async () => {
+    await repository.seedDemoData({ jobs: mockJobs, timeEntries: [], safetyReports: [], voiceLogs: [] });
+    await repository.setSetting('clock_state', { clockedIn: true, clockInTime: '2026-07-12T08:00:00Z', jobId: 'j1' });
+    const entry = { id: 'clock-entry', jobId: 'j1', jobTitle: mockJobs[0].title, date: '2026-07-12', startTime: '08:00', endTime: '10:00', hours: 2, type: 'regular' as const, notes: '', voiceLogged: false };
+    await repository.completeClockOut(entry);
+    expect(await repository.getSetting('clock_state', null)).toEqual({ clockedIn: false, clockInTime: null, jobId: null });
+    expect(await repository.getTimeEntries()).toContainEqual(entry);
+    expect(await repository.getAuditEvents()).toEqual(expect.arrayContaining([expect.objectContaining({ entityId: 'clock-entry', action: 'confirmed', details: expect.objectContaining({ source: 'clock' }) })]));
+  });
+
+  it('updates jobs but protects deletion while consequential records reference them', async () => {
+    await repository.seedDemoData({ jobs: mockJobs, timeEntries: mockTimeEntries, safetyReports: [], voiceLogs: [] });
+    await repository.updateJob({ ...mockJobs[0], title: 'Updated panel job' });
+    expect(await repository.getJobs()).toContainEqual({ ...mockJobs[0], title: 'Updated panel job' });
+    await expect(repository.deleteJob('j1')).rejects.toThrow();
   });
 });

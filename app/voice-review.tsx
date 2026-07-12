@@ -23,6 +23,7 @@ export default function VoiceReviewScreen() {
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   const [provider, setProvider] = useState('manual');
   const [transcriptionConfidence, setTranscriptionConfidence] = useState<number | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState(app.activeJobId ?? '');
   const intent = useMemo(() => extractVoiceIntent(transcript), [transcript]);
 
   useEffect(() => {
@@ -54,18 +55,25 @@ export default function VoiceReviewScreen() {
     }
     setSaving(true);
     try {
+      const voiceLogId = `voice-${Date.now()}`;
       await app.addVoiceLog({
-        id: `voice-${Date.now()}`,
+        id: voiceLogId,
         timestamp: new Date().toISOString(),
         transcript: transcript.trim(),
         category,
         processed: true,
-        jobId: app.activeJobId ?? undefined,
+        jobId: selectedJobId || undefined,
         audioUri,
         confidence: transcriptionConfidence ?? intent.confidence,
         provider,
       });
-      router.replace('/(tabs)/voice-logs');
+      if (intent.consequentialAction === 'safety' && selectedJobId) {
+        router.replace({ pathname: '/safety-review', params: { voiceLogId, transcript: transcript.trim(), jobId: selectedJobId } } as never);
+      } else if (intent.consequentialAction === 'time' && selectedJobId) {
+        router.replace({ pathname: '/time-review', params: { voiceLogId, transcript: transcript.trim(), jobId: selectedJobId } } as never);
+      } else {
+        router.replace('/(tabs)/voice-logs');
+      }
     } catch (error) {
       Alert.alert('Could not save voice log', error instanceof Error ? error.message : 'Try again.');
     } finally {
@@ -110,7 +118,15 @@ export default function VoiceReviewScreen() {
         ))}
       </View>
 
-      <Text style={styles.context}>Job: {app.activeJob?.title ?? 'No active job'}</Text>
+      <Text style={styles.label}>Target job</Text>
+      <View style={styles.jobs}>
+        {app.jobs.map((job) => (
+          <TouchableOpacity key={job.id} accessibilityRole="button" accessibilityLabel={`Attach to ${job.title}`} style={[styles.jobOption, selectedJobId === job.id && styles.categoryActive]} onPress={() => setSelectedJobId(job.id)}>
+            <Text style={[styles.jobOptionText, selectedJobId === job.id && styles.categoryTextActive]} numberOfLines={1}>{job.title}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Text style={styles.context}>Selected: {app.jobs.find((job) => job.id === selectedJobId)?.title ?? 'No job'}</Text>
       <View style={styles.proposal}>
         <Text style={styles.proposalTitle}>Suggested intent · {Math.round(intent.confidence * 100)}% confidence</Text>
         <Text style={styles.proposalBody}>
@@ -144,6 +160,9 @@ const styles = StyleSheet.create({
   categoryText: { color: Colors.dark.textMuted, fontSize: 12, textTransform: 'capitalize' },
   categoryTextActive: { color: Colors.dark.accent, fontWeight: '700' },
   context: { color: Colors.dark.textMuted, fontSize: 12, marginTop: 24 },
+  jobs: { gap: 7 },
+  jobOption: { borderColor: Colors.dark.border, borderWidth: 1, borderRadius: 10, padding: 11 },
+  jobOptionText: { color: Colors.dark.textSecondary, fontSize: 12 },
   proposal: { backgroundColor: Colors.dark.surface, borderColor: Colors.dark.border, borderWidth: 1, borderRadius: 12, padding: 13, marginTop: 12 },
   proposalTitle: { color: Colors.dark.text, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
   proposalBody: { color: Colors.dark.textMuted, fontSize: 11, lineHeight: 17, marginTop: 4 },

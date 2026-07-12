@@ -5,7 +5,9 @@ import {
   StyleSheet,
   SectionList,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Shield,
@@ -39,7 +41,8 @@ const typeConfig: Record<string, { icon: typeof Shield; label: string }> = {
 
 export default function ReportsScreen() {
   const insets = useSafeAreaInsets();
-  const { safetyReports, timeEntries } = useApp();
+  const router = useRouter();
+  const { safetyReports, timeEntries, deleteRecord } = useApp();
   const [tab, setTab] = useState<TabType>('safety');
 
   const safetySections = useMemo(() => {
@@ -67,6 +70,13 @@ export default function ReportsScreen() {
   const handleTabPress = (t: TabType) => {
     Haptics.selectionAsync();
     setTab(t);
+  };
+
+  const confirmDelete = (entityType: 'time_entry' | 'safety_report', id: string) => {
+    Alert.alert('Delete record?', 'The record is removed, but its deletion remains in the audit history.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => void deleteRecord(entityType, id) },
+    ]);
   };
 
   return (
@@ -128,6 +138,10 @@ export default function ReportsScreen() {
                     </View>
                   )}
                 </View>
+                <View style={styles.recordActions}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Edit safety report" onPress={() => router.push({ pathname: '/record-edit', params: { entityType: 'safety_report', id: item.id } } as never)}><Text style={styles.editText}>Edit</Text></TouchableOpacity>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete safety report" onPress={() => confirmDelete('safety_report', item.id)}><Text style={styles.deleteText}>Delete</Text></TouchableOpacity>
+                </View>
               </View>
             );
           }}
@@ -167,6 +181,10 @@ export default function ReportsScreen() {
                     </View>
                   )}
                   {item.voiceLogged && <Mic size={11} color={Colors.dark.textMuted} />}
+                </View>
+                <View style={styles.recordActions}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Edit time entry" onPress={() => router.push({ pathname: '/record-edit', params: { entityType: 'time_entry', id: item.id } } as never)}><Text style={styles.editText}>Edit</Text></TouchableOpacity>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete time entry" onPress={() => confirmDelete('time_entry', item.id)}><Text style={styles.deleteText}>Delete</Text></TouchableOpacity>
                 </View>
               </View>
             </View>
@@ -383,4 +401,7 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
     color: Colors.dark.warning,
   },
+  recordActions: { flexDirection: 'row', gap: 18, marginTop: 12, paddingTop: 10, borderTopColor: Colors.dark.border, borderTopWidth: 1 },
+  editText: { color: Colors.dark.accent, fontSize: 12, fontWeight: '700' },
+  deleteText: { color: Colors.dark.danger, fontSize: 12, fontWeight: '700' },
 });

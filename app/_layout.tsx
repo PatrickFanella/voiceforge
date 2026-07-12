@@ -36,6 +36,11 @@ function RootLayoutNav() {
         }}
       />
       <Stack.Screen name="voice-review" options={{ headerShown: false }} />
+      <Stack.Screen name="clock-out" options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="safety-review" options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="time-review" options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="record-edit" options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="job-edit" options={{ headerShown: false, presentation: 'modal' }} />
     </Stack>
   );
 }

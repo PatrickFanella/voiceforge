@@ -92,17 +92,17 @@
 - [x] Provide offline/manual review when no endpoint exists or a request fails.
 - [x] Create a review route where transcript and category are editable and job/proposed action are visible before save. Job reassignment remains in the consequential workflow milestone.
 - [x] Add deterministic keyword extraction with confidence and tests for time, safety, materials, note, communication, ambiguous, and empty transcripts.
-- [ ] Require explicit confirmation before creating time or safety records; write audit events linking derived records to the voice log.
+- [x] Require explicit confirmation before creating time or safety records; write audit events linking derived records to the voice log.
 - [x] Run tests and `bun run verify`; commit as `feat: add reviewable transcription workflow`.
 
 ## Milestone 6: Consequential record workflows
 
-- [ ] Add clock-in/out UI with job selection and a confirmation sheet on clock-out.
-- [ ] Calculate elapsed time from timestamps and local time zone; allow correction before writing the time entry.
-- [ ] Add safety-report review with severity, description, resolution state, and source provenance.
-- [ ] Add edit/delete flows with confirmation and audit events for time, safety, job, and voice records.
-- [ ] Add data export to a versioned JSON document including schema version and audit history.
-- [ ] Test all domain commands and critical component interactions; commit as `feat: complete reviewed field record workflows` after `bun run verify`.
+- [x] Add clock-in/out UI with job selection and a confirmation sheet on clock-out.
+- [x] Calculate elapsed time from timestamps and local time zone; allow correction before writing the time entry.
+- [x] Add safety-report review with severity, description, resolution state, and source provenance.
+- [x] Add edit/delete flows with confirmation and audit events for time, safety, job, and voice records.
+- [x] Add data export to a versioned JSON document including schema version and audit history.
+- [x] Test domain commands and repository transactions; commit as `feat: complete reviewed field record workflows` after `bun run verify`. Component-rendering coverage remains tracked in Milestone 3.
 
 ## Milestone 7: Reliability, privacy, and operational hardening
 

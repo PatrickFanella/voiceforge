@@ -63,7 +63,7 @@ export default function AccountScreen() {
         <Trash2 color={Colors.dark.danger} size={19} />
         <Text style={[styles.actionText, styles.dangerText]}>Clear local data</Text>
       </TouchableOpacity>
-      <Text style={styles.version}>VoiceForge local MVP · schema 1</Text>
+      <Text style={styles.version}>VoiceForge local MVP · schema 2</Text>
     </ScrollView>
   );
 }

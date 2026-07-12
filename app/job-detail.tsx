@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -37,7 +38,7 @@ export default function JobDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { jobs, timeEntries } = useApp();
+  const { jobs, timeEntries, deleteJob } = useApp();
 
   const job = jobs.find(j => j.id === id);
   const jobEntries = timeEntries.filter(e => e.jobId === id);
@@ -164,6 +165,11 @@ export default function JobDetailScreen() {
             ))}
           </View>
         )}
+
+        <View style={styles.jobActions}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Edit job" style={styles.editJobButton} onPress={() => router.push({ pathname: '/job-edit', params: { id: job.id } } as never)}><Text style={styles.editJobText}>Edit job</Text></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete job" style={styles.deleteJobButton} onPress={() => Alert.alert('Delete job?', 'Jobs with linked time or safety records cannot be deleted. This protects record integrity.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => void deleteJob(job.id).then(() => router.back()).catch((error: unknown) => Alert.alert('Job not deleted', error instanceof Error ? error.message : 'Linked records must be removed first.')) }])}><Text style={styles.deleteJobText}>Delete job</Text></TouchableOpacity>
+        </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -384,4 +390,9 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
+  jobActions: { gap: 10, marginTop: 8, marginBottom: 12 },
+  editJobButton: { minHeight: 48, borderRadius: 12, backgroundColor: Colors.dark.accent, alignItems: 'center', justifyContent: 'center' },
+  editJobText: { color: '#fff', fontWeight: '700' },
+  deleteJobButton: { minHeight: 48, borderRadius: 12, borderColor: Colors.dark.danger, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  deleteJobText: { color: Colors.dark.danger, fontWeight: '700' },
 });

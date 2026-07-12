@@ -1,5 +1,5 @@
 import { Mic } from 'lucide-react-native';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import VoiceButton from '@/components/VoiceButton';
@@ -31,6 +31,7 @@ export default function VoiceLogsScreen() {
               </View>
               <Text style={styles.transcript}>{item.transcript}</Text>
               <Text style={styles.job}>{job?.title ?? 'No job attached'}</Text>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete voice log" style={styles.deleteButton} onPress={() => Alert.alert('Delete voice log?', 'This removes the log record. Its audit deletion remains available in exports.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => void app.deleteRecord('voice_log', item.id) }])}><Text style={styles.deleteText}>Delete</Text></TouchableOpacity>
             </View>
           );
         }}
@@ -51,4 +52,6 @@ const styles = StyleSheet.create({
   date: { color: Colors.dark.textMuted, fontSize: 10 },
   transcript: { color: Colors.dark.text, fontSize: 14, lineHeight: 20, marginTop: 10 },
   job: { color: Colors.dark.textMuted, fontSize: 11, marginTop: 10 },
+  deleteButton: { borderTopColor: Colors.dark.border, borderTopWidth: 1, marginTop: 12, paddingTop: 10 },
+  deleteText: { color: Colors.dark.danger, fontSize: 12, fontWeight: '700' },
 });

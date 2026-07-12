@@ -1,4 +1,4 @@
-import type { Job, SafetyReport, TimeEntry, VoiceLog } from '@/types';
+import type { AuditEvent, Job, SafetyReport, TimeEntry, VoiceLog } from '@/types';
 
 import type { DatabaseConnection } from './types';
 
@@ -35,6 +35,7 @@ type VoiceLogRow = Omit<VoiceLog, 'processed' | 'jobId' | 'audioUri' | 'confiden
 };
 
 const nowIso = () => new Date().toISOString();
+const auditId = () => `audit-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 export class VoiceForgeRepository {
   constructor(private readonly db: DatabaseConnection) {}
@@ -105,6 +106,27 @@ export class VoiceForgeRepository {
     }));
   }
 
+  async getAuditEvents(): Promise<AuditEvent[]> {
+    const rows = await this.db.getAllAsync<{
+      id: string;
+      entityType: AuditEvent['entityType'];
+      entityId: string;
+      action: AuditEvent['action'];
+      sourceVoiceLogId: string | null;
+      occurredAt: string;
+      detailsJson: string;
+    }>(
+      `SELECT id, entity_type AS entityType, entity_id AS entityId, action,
+        source_voice_log_id AS sourceVoiceLogId, occurred_at AS occurredAt, details_json AS detailsJson
+       FROM audit_events ORDER BY occurred_at DESC`,
+    );
+    return rows.map(({ sourceVoiceLogId, detailsJson, ...row }) => ({
+      ...row,
+      ...(sourceVoiceLogId ? { sourceVoiceLogId } : {}),
+      details: JSON.parse(detailsJson) as Record<string, unknown>,
+    }));
+  }
+
   async getSetting<T>(key: string, fallback: T): Promise<T> {
     const row = await this.db.getFirstAsync<SettingRow>('SELECT value FROM settings WHERE key = ?', key);
     return row ? (JSON.parse(row.value) as T) : fallback;
@@ -140,20 +162,129 @@ export class VoiceForgeRepository {
     );
   }
 
+  private async writeAudit(
+    entityType: AuditEvent['entityType'],
+    entityId: string,
+    action: AuditEvent['action'],
+    sourceVoiceLogId?: string,
+    details: Record<string, unknown> = {},
+  ): Promise<void> {
+    await this.db.runAsync(
+      `INSERT INTO audit_events
+       (id, entity_type, entity_id, action, source_voice_log_id, occurred_at, details_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      auditId(), entityType, entityId, action, sourceVoiceLogId ?? null, nowIso(), JSON.stringify(details),
+    );
+  }
+
+  async addTimeEntry(entry: TimeEntry, confirmed = false): Promise<void> {
+    if (entry.sourceVoiceLogId && !confirmed) throw new Error('Explicit confirmation is required');
+    const now = nowIso();
+    await this.db.withTransactionAsync(async () => {
+      await this.db.runAsync(
+        `INSERT INTO time_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        entry.id, entry.jobId, entry.jobTitle, entry.date, entry.startTime, entry.endTime,
+        entry.hours, entry.type, entry.notes, entry.voiceLogged ? 1 : 0,
+        entry.sourceVoiceLogId ?? null, now, now,
+      );
+      await this.writeAudit('time_entry', entry.id, entry.sourceVoiceLogId ? 'confirmed' : 'created', entry.sourceVoiceLogId, {
+        hours: entry.hours, type: entry.type,
+      });
+    });
+  }
+
+  async completeClockOut(entry: TimeEntry): Promise<void> {
+    const now = nowIso();
+    await this.db.withTransactionAsync(async () => {
+      await this.db.runAsync(
+        `INSERT INTO time_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        entry.id, entry.jobId, entry.jobTitle, entry.date, entry.startTime, entry.endTime,
+        entry.hours, entry.type, entry.notes, 0, null, now, now,
+      );
+      await this.writeAudit('time_entry', entry.id, 'confirmed', undefined, { source: 'clock', hours: entry.hours, type: entry.type });
+      await this.setSetting('clock_state', { clockedIn: false, clockInTime: null, jobId: null });
+    });
+  }
+
+  async addSafetyReport(report: SafetyReport, confirmed = false): Promise<void> {
+    if (report.sourceVoiceLogId && !confirmed) throw new Error('Explicit confirmation is required');
+    const now = nowIso();
+    await this.db.withTransactionAsync(async () => {
+      await this.db.runAsync(
+        `INSERT INTO safety_reports VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        report.id, report.jobId, report.jobTitle, report.date, report.type, report.severity,
+        report.description, report.resolved ? 1 : 0, report.voiceLogged ? 1 : 0,
+        report.sourceVoiceLogId ?? null, now, now,
+      );
+      await this.writeAudit('safety_report', report.id, report.sourceVoiceLogId ? 'confirmed' : 'created', report.sourceVoiceLogId, {
+        severity: report.severity, type: report.type,
+      });
+    });
+  }
+
+  async updateTimeEntry(entry: TimeEntry): Promise<void> {
+    const result = await this.db.runAsync(
+      `UPDATE time_entries SET date = ?, start_time = ?, end_time = ?, hours = ?, type = ?, notes = ?, updated_at = ? WHERE id = ?`,
+      entry.date, entry.startTime, entry.endTime, entry.hours, entry.type, entry.notes, nowIso(), entry.id,
+    );
+    if (!result.changes) throw new Error('Time entry not found');
+    await this.writeAudit('time_entry', entry.id, 'updated', entry.sourceVoiceLogId);
+  }
+
+  async updateSafetyReport(report: SafetyReport): Promise<void> {
+    const result = await this.db.runAsync(
+      `UPDATE safety_reports SET type = ?, severity = ?, description = ?, resolved = ?, updated_at = ? WHERE id = ?`,
+      report.type, report.severity, report.description, report.resolved ? 1 : 0, nowIso(), report.id,
+    );
+    if (!result.changes) throw new Error('Safety report not found');
+    await this.writeAudit('safety_report', report.id, 'updated', report.sourceVoiceLogId);
+  }
+
+  async updateJob(job: Job): Promise<void> {
+    const result = await this.db.runAsync(
+      `UPDATE jobs SET title = ?, client = ?, address = ?, status = ?, trade = ?, priority = ?,
+        start_date = ?, due_date = ?, hours_logged = ?, hours_estimated = ?, notes_json = ?, crew_json = ?, updated_at = ?
+       WHERE id = ?`,
+      job.title, job.client, job.address, job.status, job.trade, job.priority, job.startDate, job.dueDate,
+      job.hoursLogged, job.hoursEstimated, JSON.stringify(job.notes), JSON.stringify(job.crew), nowIso(), job.id,
+    );
+    if (!result.changes) throw new Error('Job not found');
+    await this.writeAudit('job', job.id, 'updated');
+  }
+
+  async deleteJob(id: string): Promise<void> {
+    await this.db.withTransactionAsync(async () => {
+      const result = await this.db.runAsync('DELETE FROM jobs WHERE id = ?', id);
+      if (!result.changes) throw new Error('Job not found');
+      await this.writeAudit('job', id, 'deleted');
+    });
+  }
+
+  async deleteRecord(entityType: 'time_entry' | 'safety_report' | 'voice_log', id: string): Promise<void> {
+    const table = entityType === 'time_entry' ? 'time_entries' : entityType === 'safety_report' ? 'safety_reports' : 'voice_logs';
+    await this.db.withTransactionAsync(async () => {
+      const result = await this.db.runAsync(`DELETE FROM ${table} WHERE id = ?`, id);
+      if (!result.changes) throw new Error('Record not found');
+      await this.writeAudit(entityType, id, 'deleted');
+    });
+  }
+
   async exportSnapshot() {
-    const [jobs, timeEntries, safetyReports, voiceLogs] = await Promise.all([
+    const [jobs, timeEntries, safetyReports, voiceLogs, auditEvents] = await Promise.all([
       this.getJobs(),
       this.getTimeEntries(),
       this.getSafetyReports(),
       this.getVoiceLogs(),
+      this.getAuditEvents(),
     ]);
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       exportedAt: nowIso(),
       jobs,
       timeEntries,
       safetyReports,
       voiceLogs,
+      auditEvents,
     };
   }
 

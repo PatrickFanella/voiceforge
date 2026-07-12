@@ -8,9 +8,10 @@ import { getLocalDateKey } from '@/domain/time';
 interface ClockState {
   clockedIn: boolean;
   clockInTime: string | null;
+  jobId?: string | null;
 }
 
-const DEFAULT_CLOCK_STATE: ClockState = { clockedIn: false, clockInTime: null };
+const DEFAULT_CLOCK_STATE: ClockState = { clockedIn: false, clockInTime: null, jobId: null };
 
 export const [AppProvider, useApp] = createContextHook(() => {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -19,6 +20,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [voiceLogs, setVoiceLogs] = useState<VoiceLog[]>([]);
   const [clockedIn, setClockedIn] = useState<boolean>(false);
   const [clockInTime, setClockInTime] = useState<string | null>(null);
+  const [clockJobId, setClockJobId] = useState<string | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>('j1');
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -52,6 +54,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         setVoiceLogs(storedVoiceLogs);
         setClockedIn(clockState.clockedIn);
         setClockInTime(clockState.clockInTime);
+        setClockJobId(clockState.jobId ?? null);
         setActiveJobId(storedActiveJobId);
       } catch (error) {
         if (active) setLoadError(error instanceof Error ? error.message : 'Unable to load VoiceForge data');
@@ -66,21 +69,78 @@ export const [AppProvider, useApp] = createContextHook(() => {
     };
   }, []);
 
-  const toggleClock = useCallback(async () => {
-    const nextState = clockedIn
-      ? DEFAULT_CLOCK_STATE
-      : { clockedIn: true, clockInTime: new Date().toISOString() };
+  const startClock = useCallback(async (jobId: string) => {
+    if (clockedIn) throw new Error('A clock session is already active');
+    const nextState: ClockState = { clockedIn: true, clockInTime: new Date().toISOString(), jobId };
     const repository = await getRepository();
     await repository.setSetting('clock_state', nextState);
-    setClockedIn(nextState.clockedIn);
+    setClockedIn(true);
     setClockInTime(nextState.clockInTime);
+    setClockJobId(jobId);
   }, [clockedIn]);
+
+  const completeClockOut = useCallback(async (entry: TimeEntry) => {
+    const repository = await getRepository();
+    await repository.completeClockOut(entry);
+    setTimeEntries((entries) => [entry, ...entries]);
+    setClockedIn(false);
+    setClockInTime(null);
+    setClockJobId(null);
+  }, []);
 
   const addVoiceLog = useCallback(async (log: VoiceLog) => {
     const repository = await getRepository();
     await repository.addVoiceLog(log);
     setVoiceLogs(prev => [log, ...prev]);
   }, []);
+
+  const addSafetyReport = useCallback(async (report: SafetyReport, confirmed = false) => {
+    const repository = await getRepository();
+    await repository.addSafetyReport(report, confirmed);
+    setSafetyReports((reports) => [report, ...reports]);
+  }, []);
+
+  const addTimeEntry = useCallback(async (entry: TimeEntry, confirmed = false) => {
+    const repository = await getRepository();
+    await repository.addTimeEntry(entry, confirmed);
+    setTimeEntries((entries) => [entry, ...entries]);
+  }, []);
+
+  const deleteRecord = useCallback(async (entityType: 'time_entry' | 'safety_report' | 'voice_log', id: string) => {
+    const repository = await getRepository();
+    await repository.deleteRecord(entityType, id);
+    if (entityType === 'time_entry') setTimeEntries((entries) => entries.filter((entry) => entry.id !== id));
+    if (entityType === 'safety_report') setSafetyReports((reports) => reports.filter((report) => report.id !== id));
+    if (entityType === 'voice_log') setVoiceLogs((logs) => logs.filter((log) => log.id !== id));
+  }, []);
+
+  const updateTimeEntry = useCallback(async (entry: TimeEntry) => {
+    const repository = await getRepository();
+    await repository.updateTimeEntry(entry);
+    setTimeEntries((entries) => entries.map((candidate) => candidate.id === entry.id ? entry : candidate));
+  }, []);
+
+  const updateSafetyReport = useCallback(async (report: SafetyReport) => {
+    const repository = await getRepository();
+    await repository.updateSafetyReport(report);
+    setSafetyReports((reports) => reports.map((candidate) => candidate.id === report.id ? report : candidate));
+  }, []);
+
+  const updateJob = useCallback(async (job: Job) => {
+    const repository = await getRepository();
+    await repository.updateJob(job);
+    setJobs((jobs) => jobs.map((candidate) => candidate.id === job.id ? job : candidate));
+  }, []);
+
+  const deleteJob = useCallback(async (id: string) => {
+    const repository = await getRepository();
+    await repository.deleteJob(id);
+    setJobs((jobs) => jobs.filter((job) => job.id !== id));
+    if (activeJobId === id) {
+      setActiveJobId(null);
+      await repository.setSetting('active_job_id', null);
+    }
+  }, [activeJobId]);
 
   const selectActiveJob = useCallback(async (jobId: string | null) => {
     const repository = await getRepository();
@@ -102,6 +162,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     setVoiceLogs([]);
     setClockedIn(false);
     setClockInTime(null);
+    setClockJobId(null);
     setActiveJobId(null);
   }, []);
 
@@ -122,8 +183,17 @@ export const [AppProvider, useApp] = createContextHook(() => {
     activeJob,
     activeJobId,
     setActiveJobId: selectActiveJob,
-    toggleClock,
+    startClock,
+    completeClockOut,
+    clockJobId,
     addVoiceLog,
+    addSafetyReport,
+    addTimeEntry,
+    deleteRecord,
+    updateTimeEntry,
+    updateSafetyReport,
+    updateJob,
+    deleteJob,
     todayEntries,
     todayHours,
     activeJobs,
