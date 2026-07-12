@@ -1,10 +1,18 @@
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
+import { AuthenticationError, AuthorizationError, type TokenVerifier } from '@voiceforge/auth';
 import { HealthResponse } from '@voiceforge/contracts';
+import type { TenancyRepository } from '@voiceforge/database';
 import Fastify from 'fastify';
+import { registerTenancyRoutes } from './routes/tenancy.js';
 
-export async function buildApp() {
+export interface AppDependencies {
+  verifier: TokenVerifier;
+  tenancy: Pick<TenancyRepository, 'bootstrapIdentity' | 'createTeam' | 'getAccess' | 'createInvitation' | 'acceptInvitation'>;
+}
+
+export async function buildApp(dependencies?: AppDependencies) {
   const app = Fastify({ logger: false, genReqId: () => `req_${crypto.randomUUID()}` })
     .withTypeProvider<TypeBoxTypeProvider>();
 
@@ -29,6 +37,8 @@ export async function buildApp() {
     timestamp: new Date().toISOString(),
   }));
 
+  if (dependencies) await registerTenancyRoutes(app, { verifier: dependencies.verifier, store: dependencies.tenancy });
+
   app.setNotFoundHandler((request, reply) => reply.code(404).send({
     error: {
       code: 'NOT_FOUND',
@@ -40,6 +50,12 @@ export async function buildApp() {
 
   app.setErrorHandler((error, request, reply) => {
     request.log.error({ err: error }, 'request failed');
+    if (error instanceof AuthenticationError) return reply.code(401).send({
+      error: { code: 'UNAUTHENTICATED', message: 'Authentication is required.', requestId: request.id, details: {} },
+    });
+    if (error instanceof AuthorizationError) return reply.code(403).send({
+      error: { code: 'FORBIDDEN', message: 'You do not have permission to perform this action.', requestId: request.id, details: {} },
+    });
     const candidateStatus = error instanceof Error && 'statusCode' in error
       ? Number(error.statusCode)
       : 500;

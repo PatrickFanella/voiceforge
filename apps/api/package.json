@@ -18,6 +18,8 @@
     "@fastify/swagger-ui": "^5.2.3",
     "@fastify/type-provider-typebox": "^5.2.0",
     "@voiceforge/contracts": "workspace:*",
+    "@voiceforge/auth": "workspace:*",
+    "@voiceforge/database": "workspace:*",
     "fastify": "^5.6.2"
   },
   "devDependencies": {

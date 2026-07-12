@@ -12,7 +12,9 @@
         "@fastify/swagger": "^9.5.1",
         "@fastify/swagger-ui": "^5.2.3",
         "@fastify/type-provider-typebox": "^5.2.0",
+        "@voiceforge/auth": "workspace:*",
         "@voiceforge/contracts": "workspace:*",
+        "@voiceforge/database": "workspace:*",
         "fastify": "^5.6.2",
       },
       "devDependencies": {
@@ -74,6 +76,18 @@
         "eslint-config-expo": "~10.0.0",
         "expo-doctor": "^1.17.13",
         "react-test-renderer": "19.1.0",
+        "typescript": "~5.9.2",
+        "vitest": "^3.2.4",
+      },
+    },
+    "packages/auth": {
+      "name": "@voiceforge/auth",
+      "version": "0.1.0",
+      "dependencies": {
+        "jose": "^6.1.2",
+      },
+      "devDependencies": {
+        "@types/node": "^24.10.1",
         "typescript": "~5.9.2",
         "vitest": "^3.2.4",
       },
@@ -822,6 +836,8 @@
 
     "@voiceforge/api": ["@voiceforge/api@workspace:apps/api"],
 
+    "@voiceforge/auth": ["@voiceforge/auth@workspace:packages/auth"],
+
     "@voiceforge/contracts": ["@voiceforge/contracts@workspace:packages/contracts"],
 
     "@voiceforge/database": ["@voiceforge/database@workspace:packages/database"],
@@ -1505,6 +1521,8 @@
     "jest-worker": ["jest-worker@29.7.0", "", { "dependencies": { "@types/node": "*", "jest-util": "^29.7.0", "merge-stream": "^2.0.0", "supports-color": "^8.0.0" } }, "sha512-eIz2msL/EzL9UFTFFx7jBTkeZfku0yUAyZZZmJ93H2TYEiroIx2PQjEXcwYtYl8zXCxb+PAmA2hLIt/6ZEkPHw=="],
 
     "jimp-compact": ["jimp-compact@0.16.1", "", {}, "sha512-dZ6Ra7u1G8c4Letq/B5EzAxj4tLFHL+cGtdpR+PVm4yzPDj+lCk+AbivWt1eOM+ikzkowtyV7qSqX6qr3t71Ww=="],
+
+    "jose": ["jose@6.2.3", "", {}, "sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw=="],
 
     "js-tokens": ["js-tokens@4.0.0", "", {}, "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="],
 

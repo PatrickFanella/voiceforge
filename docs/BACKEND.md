@@ -9,6 +9,9 @@ VoiceForge is being implemented as a contract-first TypeScript platform. Node.js
 - Drizzle/PostgreSQL schema and migration for users, identities, devices, personal/team workspaces, memberships, invitations, jobs, workspace change feeds, tombstones, idempotency records, and hash-chained audit events
 - Tenant-oriented indexes and foreign keys, including workspace-scoped change and audit sequences
 - Docker Compose dependencies for PostgreSQL, Redis, S3-compatible MinIO, and Mailpit
+- Auth0 RS256 access-token validation with strict issuer, audience, algorithm, and expiry checks
+- Idempotent first-login creation of one private personal workspace, protected by a PostgreSQL advisory transaction lock
+- Team creation, workspace-scoped role policies, opaque invitation tokens stored only as SHA-256 digests, and transactional invitation acceptance
 
 The schema is intentionally expanded milestone by milestone. Workflow tables for voice, time approval, safety triage, billing, notifications, exports, webhooks, retention, and legal holds are added with their corresponding domain behavior rather than as unused placeholders.
 
@@ -23,6 +26,8 @@ bun run --cwd apps/api dev
 ```
 
 The API listens on port 3000 by default. OpenAPI UI is at `/documentation`; the machine-readable committed contract is `apps/api/openapi.json`.
+
+Auth0 supplies identity only. Roles, invitations, memberships, and workspace access are loaded from PostgreSQL on protected requests. A matching email address does not implicitly link two Auth0 subjects; account linking must occur in Auth0 and produce the canonical subject. Invitation acceptance requires a verified token email matching the invitation.
 
 ## Migration policy
 
