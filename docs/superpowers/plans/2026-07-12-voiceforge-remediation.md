@@ -125,7 +125,7 @@
 
 ## Completion evidence
 
-- Clean clone `/tmp/voiceforge-final-audit.fDLyZc`: frozen install succeeded without lockfile changes.
+- Final clean clone `/tmp/voiceforge-completion.429shB` at `bf453be`: frozen install succeeded without lockfile changes.
 - Clean clone: 10 test files and 39 tests passed; TypeScript and ESLint exited successfully.
 - Clean clone: cold single-worker Expo web export produced `dist/`; Expo Doctor passed 18/18 checks.
 - Repository tests execute the production migration SQL and cover one-time seeding, foreign keys, persistence hydration, explicit confirmation, atomic clock-out, atomic audited updates, deletions, retention metadata, audit export, and clear-local-data behavior.
