@@ -3,10 +3,12 @@ import { GovernanceRepository, IntegrationRepository, SafetyRepository, createDa
 import { createExpoPushAdapter, createSafetyDeliveryProcessor, createSesEmailAdapter } from '@voiceforge/notifications';
 import { SESv2Client } from '@aws-sdk/client-sesv2';
 import { createDeepgramProvider, createTranscriptionProcessor, ProviderResponseError } from '@voiceforge/transcription';
+import { startTracing } from '@voiceforge/observability';
 import { Queue, Worker, type ConnectionOptions } from 'bullmq';
 import { createWebhookSignature, decryptSecretEnvelope, exportRowsToCsv, parseRedisConnection, recoverQueuedJobs, transcriptionJobOptions, webhookRetryDelay } from './runtime.js';
 
 const required = (name: string) => { const value = process.env[name]; if (!value) throw new Error(`${name} is required.`); return value; };
+const tracing = await startTracing('voiceforge-worker');
 const database = createDatabase(required('DATABASE_URL'));
 const repository = new TranscriptionRepository(database.db);
 const connection: ConnectionOptions = parseRedisConnection(required('REDIS_URL'));
@@ -84,6 +86,6 @@ async function shutdown() {
   clearInterval(retentionTimer);
   await Promise.all([worker.close(), safetyWorker.close(), exportWorker.close(), subjectWorker.close()]);
   await Promise.all([queue.close(), safetyQueue.close(), exportQueue.close(), subjectQueue.close()]);
-  ses.destroy(); await database.close();
+  ses.destroy(); await Promise.all([database.close(), tracing.shutdown()]);
 }
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => void shutdown().finally(() => process.exit(0)));

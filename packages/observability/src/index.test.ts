@@ -1,0 +1,2 @@
+import { describe, expect, it } from 'vitest'; import { MetricsRegistry, REDACT_PATHS } from './index.js';
+describe('observability', () => { it('redacts sensitive fields and emits bounded metrics', () => { expect(REDACT_PATHS).toContain('*.transcript'); const metrics = new MetricsRegistry(); metrics.increment('requests_total', { status: '200' }); metrics.observe('request_ms', 12, { route: 'health' }); expect(metrics.prometheus()).toContain('requests_total{status="200"} 1'); expect(metrics.prometheus()).toContain('request_ms{route="health"}_p95 12'); }); });

@@ -25,6 +25,7 @@ import type { IntegrationRepository } from '@voiceforge/database';
 import { registerIntegrationRoutes, type ExportQueue, type ExportStorage } from './routes/integrations.js';
 import type { GovernanceRepository } from '@voiceforge/database';
 import { registerGovernanceRoutes, type SubjectQueue, type SubjectStorage } from './routes/governance.js';
+import { MetricsRegistry, REDACT_PATHS } from '@voiceforge/observability';
 
 export interface AppDependencies {
   verifier: TokenVerifier;
@@ -48,8 +49,11 @@ export interface AppDependencies {
 }
 
 export async function buildApp(dependencies?: AppDependencies) {
-  const app = Fastify({ logger: false, genReqId: () => `req_${crypto.randomUUID()}` })
+  const metrics = new MetricsRegistry();
+  const app = Fastify({ logger: process.env.NODE_ENV === 'test' ? false : { level: process.env.LOG_LEVEL ?? 'info', redact: { paths: REDACT_PATHS, censor: '[REDACTED]' } }, genReqId: () => `req_${crypto.randomUUID()}` })
     .withTypeProvider<TypeBoxTypeProvider>();
+  app.addHook('onRequest', async (request) => { (request as typeof request & { startedAt: number }).startedAt = performance.now(); });
+  app.addHook('onResponse', async (request, reply) => { const startedAt = (request as typeof request & { startedAt?: number }).startedAt ?? performance.now(); const labels = { route: request.routeOptions.url ?? 'unknown', method: request.method, status: String(reply.statusCode) }; metrics.increment('voiceforge_http_requests_total', labels); metrics.observe('voiceforge_http_request_duration_ms', performance.now() - startedAt, labels); });
 
   await app.register(swagger, {
     openapi: {
@@ -72,6 +76,7 @@ export async function buildApp(dependencies?: AppDependencies) {
     version: '0.1.0',
     timestamp: new Date().toISOString(),
   }));
+  app.get('/v1/metrics', { schema: { operationId: 'getMetrics', tags: ['operations'] } }, async (request, reply) => { if (process.env.METRICS_TOKEN && request.headers.authorization !== `Bearer ${process.env.METRICS_TOKEN}`) return reply.code(401).send('Unauthorized'); return reply.type('text/plain; version=0.0.4').send(metrics.prometheus()); });
 
   if (dependencies) {
     const billing = dependencies.billing;

@@ -2,6 +2,7 @@ import { createAuth0TokenVerifier } from '@voiceforge/auth';
 import { BillingRepository, createDatabase, GovernanceRepository, IntegrationRepository, JobRepository, SafetyRepository, SyncRepository, TenancyRepository, TimeRepository, TranscriptionRepository } from '@voiceforge/database';
 import Stripe from 'stripe';
 import { StripeBillingGateway } from './services/stripe-gateway.js';
+import { startTracing } from '@voiceforge/observability';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Queue, type ConnectionOptions } from 'bullmq';
@@ -13,6 +14,7 @@ const required = (name: string) => {
   if (!value) throw new Error(`${name} is required.`);
   return value;
 };
+const tracing = await startTracing('voiceforge-api');
 const database = createDatabase(required('DATABASE_URL'));
 const redisUrl = new URL(required('REDIS_URL'));
 const connection: ConnectionOptions = {
@@ -60,7 +62,7 @@ const app = await buildApp({
 const port = Number.parseInt(process.env.PORT ?? '3000', 10);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(signal, () => void app.close().then(() => Promise.all([transcriptionQueue.close(), safetyQueue.close(), exportQueue.close(), subjectQueue.close()])).then(database.close).finally(() => process.exit(0)));
+  process.on(signal, () => void app.close().then(() => Promise.all([transcriptionQueue.close(), safetyQueue.close(), exportQueue.close(), subjectQueue.close(), tracing.shutdown()])).then(database.close).finally(() => process.exit(0)));
 }
 
 await app.listen({ host: '0.0.0.0', port });

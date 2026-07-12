@@ -55,6 +55,19 @@
         }
       }
     },
+    "/v1/metrics": {
+      "get": {
+        "operationId": "getMetrics",
+        "tags": [
+          "operations"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/v1/auth/bootstrap": {
       "post": {
         "operationId": "bootstrapIdentity",

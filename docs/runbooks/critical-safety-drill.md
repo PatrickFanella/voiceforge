@@ -1,0 +1,3 @@
+# Critical safety escalation drill
+
+Run quarterly in staging with real devices and controlled inboxes. Submit a clearly marked test critical report; verify the API enqueues it within 10 seconds, first push and email deliveries arrive, the SLA timer advances, and an unacknowledged report repeats to the next contact. Acknowledge on mobile and verify repeats stop. Simulate provider failure, confirm retry/dead-letter diagnostics, then replay. Preserve timestamps and request/delivery IDs. Never use drill copy that could be mistaken for a real emergency, and confirm every screen directs immediate danger to local emergency services.

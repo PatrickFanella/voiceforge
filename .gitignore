@@ -38,6 +38,7 @@ yarn-error.*
 *.tsbuildinfo
 .vercel
 .next/
+.terraform/
 
 .rork
 

@@ -1,0 +1,7 @@
+environment             = "staging"
+aws_region              = "us-east-1"
+api_image               = "123456789012.dkr.ecr.us-east-1.amazonaws.com/voiceforge-staging-api@sha256:..."
+worker_image            = "123456789012.dkr.ecr.us-east-1.amazonaws.com/voiceforge-staging-worker@sha256:..."
+admin_image             = "123456789012.dkr.ecr.us-east-1.amazonaws.com/voiceforge-staging-admin@sha256:..."
+domain_name             = "staging.voiceforge.example"
+route53_zone_id         = "Z000000000000"
