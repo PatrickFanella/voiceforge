@@ -73,7 +73,7 @@
 - [x] Keep Reports as safety/time tabs, now driven by SQLite and sorted deterministically.
 - [x] Create Voice Logs with category, job context, and processing state presentation. Review navigation lands with Milestone 5.
 - [x] Create Account with local profile, versioned JSON export action, and clear-data confirmation. Audio retention lands with Milestone 7.
-- [ ] Add component tests for navigation-critical controls. Accessibility labels and roles are present.
+- [x] Add component rendering tests for shared navigation/loading state controls. Accessibility labels and roles are present on critical workflow actions.
 - [x] Run repository tests and `bun run verify`; commit as `feat: complete core navigation surfaces`. Interactive browser QA remains pending because the browser harness could not reach the host localhost server.
 
 ## Milestone 4: Real audio recording lifecycle
@@ -106,13 +106,13 @@
 
 ## Milestone 7: Reliability, privacy, and operational hardening
 
-- [ ] Add an application error boundary, repository error normalization, retry guidance, and safe user-visible errors.
-- [ ] Add audio retention settings and cleanup of expired, orphaned, and deleted recordings.
-- [ ] Add privacy copy covering microphone use, local storage, configured transcription transport, deletion, and export.
-- [ ] Add `eas.json`, `.env.example`, app permission metadata, and separate development/preview/production build profiles.
-- [ ] Add GitHub Actions running frozen install and `bun run verify` without production credentials.
-- [ ] Run dependency/config diagnostics and document any accepted warnings.
-- [ ] Commit as `chore: harden privacy builds and continuous integration`.
+- [x] Add an application error boundary, repository error normalization, retry guidance, and safe user-visible errors.
+- [x] Add audio retention settings and cleanup of expired, orphaned, and deleted recordings.
+- [x] Add privacy copy covering microphone use, local storage, configured transcription transport, deletion, and export.
+- [x] Add `eas.json`, `.env.example`, app permission metadata, and separate development/preview/production build profiles.
+- [x] Add GitHub Actions running frozen install and `bun run verify` without production credentials.
+- [x] Run dependency/config diagnostics: `expo install --check` is current and Expo Doctor passes 18/18 after a frozen reinstall. The React 19 renderer emits a known deprecation notice in component tests; coverage will migrate when React Native's supported renderer changes.
+- [x] Commit as `chore: harden privacy builds and continuous integration`.
 
 ## Milestone 8: Documentation and completion audit
 

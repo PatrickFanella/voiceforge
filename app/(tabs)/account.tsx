@@ -47,6 +47,16 @@ export default function AccountScreen() {
           <Text style={styles.infoBody}>Your field records are stored in an on-device SQLite database. VoiceForge currently has no account server or background sync.</Text>
         </View>
       </View>
+
+      <Text style={styles.sectionTitle}>Audio retention</Text>
+      <Text style={styles.retentionBody}>Transcripts remain until you delete them. Recorded audio is removed after the selected period; “Forever” keeps it until manual deletion.</Text>
+      <View style={styles.retentionOptions}>
+        {([7, 30, 90, 0] as const).map((days) => (
+          <TouchableOpacity key={days} accessibilityRole="button" accessibilityLabel={`Retain audio ${days === 0 ? 'forever' : `for ${days} days`}`} style={[styles.retentionOption, app.audioRetentionDays === days && styles.retentionActive]} onPress={() => void app.setAudioRetentionDays(days)}>
+            <Text style={[styles.retentionText, app.audioRetentionDays === days && styles.retentionTextActive]}>{days === 0 ? 'Forever' : `${days} days`}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
       <View style={styles.infoCard}>
         <Shield color={Colors.dark.success} size={20} />
         <View style={styles.infoText}>
@@ -85,4 +95,11 @@ const styles = StyleSheet.create({
   actionText: { color: Colors.dark.text, fontSize: 14, fontWeight: '700' },
   dangerText: { color: Colors.dark.danger },
   version: { color: Colors.dark.textMuted, fontSize: 11, textAlign: 'center', marginTop: 24 },
+  sectionTitle: { color: Colors.dark.text, fontSize: 16, fontWeight: '700', marginTop: 16 },
+  retentionBody: { color: Colors.dark.textMuted, fontSize: 12, lineHeight: 18, marginTop: 5 },
+  retentionOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  retentionOption: { borderColor: Colors.dark.border, borderWidth: 1, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 },
+  retentionActive: { borderColor: Colors.dark.accent, backgroundColor: Colors.dark.accentDim },
+  retentionText: { color: Colors.dark.textMuted, fontSize: 12 },
+  retentionTextActive: { color: Colors.dark.accent, fontWeight: '700' },
 });

@@ -269,6 +269,17 @@ export class VoiceForgeRepository {
     });
   }
 
+  async clearAudioUris(uris: string[]): Promise<void> {
+    if (!uris.length) return;
+    await this.db.withTransactionAsync(async () => {
+      for (const uri of uris) {
+        const rows = await this.db.getAllAsync<{ id: string }>('SELECT id FROM voice_logs WHERE audio_uri = ?', uri);
+        await this.db.runAsync('UPDATE voice_logs SET audio_uri = NULL, updated_at = ? WHERE audio_uri = ?', nowIso(), uri);
+        for (const row of rows) await this.writeAudit('voice_log', row.id, 'updated', undefined, { audioExpired: true });
+      }
+    });
+  }
+
   async exportSnapshot() {
     const [jobs, timeEntries, safetyReports, voiceLogs, auditEvents] = await Promise.all([
       this.getJobs(),

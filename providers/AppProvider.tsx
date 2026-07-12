@@ -3,7 +3,9 @@ import createContextHook from '@nkzw/create-context-hook';
 import { Job, TimeEntry, SafetyReport, VoiceLog } from '@/types';
 import { mockJobs, mockTimeEntries, mockSafetyReports, mockVoiceLogs, mockWorker } from '@/mocks/data';
 import { getRepository } from '@/db';
+import { withRepositoryError } from '@/db/errors';
 import { getLocalDateKey } from '@/domain/time';
+import { cleanupRetainedAudio, deleteAudioFile, type AudioRetentionDays } from '@/features/voice/retention';
 
 interface ClockState {
   clockedIn: boolean;
@@ -24,6 +26,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const [activeJobId, setActiveJobId] = useState<string | null>('j1');
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [audioRetentionDays, setAudioRetentionDaysState] = useState<AudioRetentionDays>(30);
 
   useEffect(() => {
     let active = true;
@@ -31,13 +34,13 @@ export const [AppProvider, useApp] = createContextHook(() => {
     async function hydrate() {
       try {
         const repository = await getRepository();
-        await repository.seedDemoData({
+        await withRepositoryError('initialize local records', () => repository.seedDemoData({
           jobs: mockJobs,
           timeEntries: mockTimeEntries,
           safetyReports: mockSafetyReports,
           voiceLogs: mockVoiceLogs,
-        });
-        const [storedJobs, storedTimeEntries, storedSafetyReports, storedVoiceLogs, clockState, storedActiveJobId] =
+        }));
+        const [storedJobs, storedTimeEntries, storedSafetyReports, storedVoiceLogs, clockState, storedActiveJobId, storedRetention] =
           await Promise.all([
             repository.getJobs(),
             repository.getTimeEntries(),
@@ -45,6 +48,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
             repository.getVoiceLogs(),
             repository.getSetting<ClockState>('clock_state', DEFAULT_CLOCK_STATE),
             repository.getSetting<string | null>('active_job_id', 'j1'),
+            repository.getSetting<AudioRetentionDays>('audio_retention_days', 30),
           ]);
 
         if (!active) return;
@@ -56,6 +60,12 @@ export const [AppProvider, useApp] = createContextHook(() => {
         setClockInTime(clockState.clockInTime);
         setClockJobId(clockState.jobId ?? null);
         setActiveJobId(storedActiveJobId);
+        setAudioRetentionDaysState(storedRetention);
+        const expired = cleanupRetainedAudio(storedVoiceLogs, storedRetention);
+        if (expired.length) {
+          await repository.clearAudioUris(expired);
+          setVoiceLogs(storedVoiceLogs.map((log) => expired.includes(log.audioUri ?? '') ? { ...log, audioUri: undefined } : log));
+        }
       } catch (error) {
         if (active) setLoadError(error instanceof Error ? error.message : 'Unable to load VoiceForge data');
       } finally {
@@ -73,7 +83,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     if (clockedIn) throw new Error('A clock session is already active');
     const nextState: ClockState = { clockedIn: true, clockInTime: new Date().toISOString(), jobId };
     const repository = await getRepository();
-    await repository.setSetting('clock_state', nextState);
+    await withRepositoryError('start the clock', () => repository.setSetting('clock_state', nextState));
     setClockedIn(true);
     setClockInTime(nextState.clockInTime);
     setClockJobId(jobId);
@@ -81,7 +91,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const completeClockOut = useCallback(async (entry: TimeEntry) => {
     const repository = await getRepository();
-    await repository.completeClockOut(entry);
+    await withRepositoryError('complete clock-out', () => repository.completeClockOut(entry));
     setTimeEntries((entries) => [entry, ...entries]);
     setClockedIn(false);
     setClockInTime(null);
@@ -90,51 +100,62 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const addVoiceLog = useCallback(async (log: VoiceLog) => {
     const repository = await getRepository();
-    await repository.addVoiceLog(log);
+    await withRepositoryError('save the voice log', () => repository.addVoiceLog(log));
     setVoiceLogs(prev => [log, ...prev]);
   }, []);
 
   const addSafetyReport = useCallback(async (report: SafetyReport, confirmed = false) => {
     const repository = await getRepository();
-    await repository.addSafetyReport(report, confirmed);
+    await withRepositoryError('save the safety report', () => repository.addSafetyReport(report, confirmed));
     setSafetyReports((reports) => [report, ...reports]);
   }, []);
 
   const addTimeEntry = useCallback(async (entry: TimeEntry, confirmed = false) => {
     const repository = await getRepository();
-    await repository.addTimeEntry(entry, confirmed);
+    await withRepositoryError('save the time entry', () => repository.addTimeEntry(entry, confirmed));
     setTimeEntries((entries) => [entry, ...entries]);
   }, []);
 
   const deleteRecord = useCallback(async (entityType: 'time_entry' | 'safety_report' | 'voice_log', id: string) => {
     const repository = await getRepository();
-    await repository.deleteRecord(entityType, id);
+    const audioUri = entityType === 'voice_log' ? voiceLogs.find((log) => log.id === id)?.audioUri : undefined;
+    await withRepositoryError('delete the record', () => repository.deleteRecord(entityType, id));
+    deleteAudioFile(audioUri);
     if (entityType === 'time_entry') setTimeEntries((entries) => entries.filter((entry) => entry.id !== id));
     if (entityType === 'safety_report') setSafetyReports((reports) => reports.filter((report) => report.id !== id));
     if (entityType === 'voice_log') setVoiceLogs((logs) => logs.filter((log) => log.id !== id));
-  }, []);
+  }, [voiceLogs]);
+
+  const setAudioRetentionDays = useCallback(async (days: AudioRetentionDays) => {
+    const repository = await getRepository();
+    await withRepositoryError('update audio retention', () => repository.setSetting('audio_retention_days', days));
+    const expired = cleanupRetainedAudio(voiceLogs, days);
+    await withRepositoryError('expire retained audio', () => repository.clearAudioUris(expired));
+    setVoiceLogs((logs) => logs.map((log) => expired.includes(log.audioUri ?? '') ? { ...log, audioUri: undefined } : log));
+    setAudioRetentionDaysState(days);
+  }, [voiceLogs]);
 
   const updateTimeEntry = useCallback(async (entry: TimeEntry) => {
     const repository = await getRepository();
-    await repository.updateTimeEntry(entry);
+    await withRepositoryError('update the time entry', () => repository.updateTimeEntry(entry));
     setTimeEntries((entries) => entries.map((candidate) => candidate.id === entry.id ? entry : candidate));
   }, []);
 
   const updateSafetyReport = useCallback(async (report: SafetyReport) => {
     const repository = await getRepository();
-    await repository.updateSafetyReport(report);
+    await withRepositoryError('update the safety report', () => repository.updateSafetyReport(report));
     setSafetyReports((reports) => reports.map((candidate) => candidate.id === report.id ? report : candidate));
   }, []);
 
   const updateJob = useCallback(async (job: Job) => {
     const repository = await getRepository();
-    await repository.updateJob(job);
+    await withRepositoryError('update the job', () => repository.updateJob(job));
     setJobs((jobs) => jobs.map((candidate) => candidate.id === job.id ? job : candidate));
   }, []);
 
   const deleteJob = useCallback(async (id: string) => {
     const repository = await getRepository();
-    await repository.deleteJob(id);
+    await withRepositoryError('delete the job', () => repository.deleteJob(id));
     setJobs((jobs) => jobs.filter((job) => job.id !== id));
     if (activeJobId === id) {
       setActiveJobId(null);
@@ -144,18 +165,18 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
   const selectActiveJob = useCallback(async (jobId: string | null) => {
     const repository = await getRepository();
-    await repository.setSetting('active_job_id', jobId);
+    await withRepositoryError('select the active job', () => repository.setSetting('active_job_id', jobId));
     setActiveJobId(jobId);
   }, []);
 
   const exportData = useCallback(async () => {
     const repository = await getRepository();
-    return repository.exportSnapshot();
+    return withRepositoryError('export local data', () => repository.exportSnapshot());
   }, []);
 
   const clearData = useCallback(async () => {
     const repository = await getRepository();
-    await repository.clearUserData();
+    await withRepositoryError('clear local data', () => repository.clearUserData());
     setJobs([]);
     setTimeEntries([]);
     setSafetyReports([]);
@@ -201,5 +222,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     loadError,
     exportData,
     clearData,
+    audioRetentionDays,
+    setAudioRetentionDays,
   };
 });
