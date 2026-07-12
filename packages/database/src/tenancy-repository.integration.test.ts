@@ -6,6 +6,7 @@ import { TenancyRepository } from './tenancy-repository.js';
 import { SyncRepository } from './sync-repository.js';
 import { TranscriptionRepository } from './transcription-repository.js';
 import { TimeRepository } from './time-repository.js';
+import { SafetyRepository } from './safety-repository.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const suite = databaseUrl ? describe : describe.skip;
@@ -17,6 +18,7 @@ suite('TenancyRepository against PostgreSQL', () => {
   const syncRepository = new SyncRepository(database.db);
   const transcriptionRepository = new TranscriptionRepository(database.db);
   const timeRepository = new TimeRepository(database.db);
+  const safetyRepository = new SafetyRepository(database.db);
 
   beforeAll(async () => {
     await database.db.execute(sql`truncate table invitations, workspace_memberships, identities, users, workspaces cascade`);
@@ -213,5 +215,56 @@ suite('TenancyRepository against PostgreSQL', () => {
     const finalized = await timeRepository.submit({ workspaceId: actor.personalWorkspaceId, actorUserId: actor.user.id, idempotencyKey: 'personal-time-submit', id: personal.id, requiresApproval: false });
     expect(finalized.status).toBe('approved');
     expect((await timeRepository.history(actor.personalWorkspaceId, personal.id)).approvals).toEqual([]);
+  });
+
+  it('immediately escalates critical safety reports, repeats until acknowledgement, and preserves revisions', async () => {
+    const actor = await repository.bootstrapIdentity({ subject: 'auth0|safety-owner', email: 'safety@example.com' });
+    const team = await repository.createTeam(actor.user.id, { name: 'Safety crew', timeZone: 'America/Chicago' });
+    const job = await jobRepository.create({
+      workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'safety-job-create-01', id: crypto.randomUUID(), name: 'Safety job',
+    });
+    await safetyRepository.registerPushToken({
+      userId: actor.user.id, deviceId: crypto.randomUUID(), platform: 'ios', expoToken: 'ExponentPushToken[safety-owner]',
+    });
+    await safetyRepository.configurePolicy({
+      workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'safety-policy-00001',
+      acknowledgementSlaMinutes: 5, escalationRepeatMinutes: 3,
+      emergencyInstructions: 'Call local emergency services for immediate danger.',
+    });
+    const reportId = crypto.randomUUID();
+    await safetyRepository.createDraft({
+      workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'safety-create-00001', id: reportId,
+      jobId: job.id, severity: 'critical', reportType: 'hazard', description: 'Exposed energized conductor',
+      occurredAt: new Date('2026-07-12T12:00:00Z'),
+    });
+    const submitted = await safetyRepository.submit({ workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'safety-submit-00001', id: reportId });
+    expect(submitted.nextEscalationAt?.getTime()).toBe(submitted.submittedAt?.getTime());
+    const initial = await safetyRepository.prepareEscalation(reportId, submitted.submittedAt!);
+    expect(initial.deliveries.map((delivery) => delivery.channel).sort()).toEqual(['email', 'push']);
+    expect(initial.deliveries[0]).not.toHaveProperty('description');
+    expect(initial.deliveries[0]?.emergencyInstructions).toContain('emergency services');
+    expect(initial.nextEscalationAt?.getTime()).toBe(submitted.submittedAt!.getTime() + 3 * 60_000);
+    const repeated = await safetyRepository.prepareEscalation(reportId, initial.nextEscalationAt!);
+    expect(repeated.deliveries).toHaveLength(2);
+    const corrected = await safetyRepository.correct({
+      workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'safety-correct-0001', id: reportId,
+      severity: 'critical', reportType: 'hazard', description: 'Exposed 480V energized conductor',
+      occurredAt: new Date('2026-07-12T12:00:00Z'), reason: 'Voltage confirmed', allowOtherReporter: false,
+    });
+    expect(corrected.revisionNumber).toBe(2);
+    const acknowledged = await safetyRepository.acknowledge({
+      workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'safety-ack-0000001', id: reportId, note: 'Crew notified',
+    });
+    expect(acknowledged).toMatchObject({ status: 'acknowledged', nextEscalationAt: null });
+    expect((await safetyRepository.prepareEscalation(reportId, repeated.nextEscalationAt!)).deliveries).toEqual([]);
+    await safetyRepository.transition({ workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'safety-investigate1', id: reportId, status: 'investigating' });
+    await safetyRepository.transition({ workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'safety-mitigate-001', id: reportId, status: 'mitigated' });
+    const closed = await safetyRepository.transition({ workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'safety-close-000001', id: reportId, status: 'closed' });
+    expect(closed.status).toBe('closed');
+
+    const failedDelivery = initial.deliveries[0]!;
+    for (let attempt = 0; attempt < 5; attempt += 1) await safetyRepository.markDelivery({ id: failedDelivery.id, success: false, error: 'provider unavailable' });
+    const delivery = await database.db.execute(sql`select status, attempt_count from notification_deliveries where id = ${failedDelivery.id}`);
+    expect(delivery[0]).toEqual({ status: 'dead_letter', attempt_count: 5 });
   });
 });

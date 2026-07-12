@@ -5,3 +5,4 @@ export * from './job-repository.js';
 export * from './sync-repository.js';
 export * from './transcription-repository.js';
 export * from './time-repository.js';
+export * from './safety-repository.js';

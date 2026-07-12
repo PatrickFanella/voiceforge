@@ -15,6 +15,9 @@ import { TranscriptionInputError, type TranscriptionRepository } from '@voicefor
 import type { TimeRepository } from '@voiceforge/database';
 import { TimeWorkflowError } from '@voiceforge/workflows';
 import { registerTimeRoutes } from './routes/time.js';
+import { SafetyWorkflowError } from '@voiceforge/workflows';
+import type { SafetyRepository } from '@voiceforge/database';
+import { registerSafetyRoutes, type SafetyQueue } from './routes/safety.js';
 
 export interface AppDependencies {
   verifier: TokenVerifier;
@@ -28,6 +31,10 @@ export interface AppDependencies {
     queue: TranscriptionQueue;
   };
   time?: Pick<TimeRepository, 'startClock' | 'stopClock' | 'createDraft' | 'editDraft' | 'submit' | 'decide' | 'correct' | 'listApprovalQueue' | 'history'>;
+  safety?: {
+    repository: Pick<SafetyRepository, 'registerPushToken' | 'configurePolicy' | 'configureContacts' | 'createDraft' | 'submit' | 'acknowledge' | 'transition' | 'correct' | 'assign' | 'silence' | 'listTriage' | 'listDeliveries'>;
+    queue: SafetyQueue;
+  };
 }
 
 export async function buildApp(dependencies?: AppDependencies) {
@@ -60,12 +67,15 @@ export async function buildApp(dependencies?: AppDependencies) {
     if (dependencies.jobs) await registerJobRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, jobs: dependencies.jobs });
     if (dependencies.jobs && dependencies.sync && dependencies.cursorSecret) await registerSyncRoutes(app, {
       verifier: dependencies.verifier, tenancy: dependencies.tenancy, jobs: dependencies.jobs,
-      sync: dependencies.sync, cursorSecret: dependencies.cursorSecret, ...(dependencies.time ? { time: dependencies.time } : {}),
+      sync: dependencies.sync, cursorSecret: dependencies.cursorSecret,
+      ...(dependencies.time ? { time: dependencies.time } : {}),
+      ...(dependencies.safety ? { safety: dependencies.safety.repository } : {}),
     });
     if (dependencies.transcription) await registerTranscriptionRoutes(app, {
       verifier: dependencies.verifier, tenancy: dependencies.tenancy, ...dependencies.transcription,
     });
     if (dependencies.time) await registerTimeRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, repository: dependencies.time });
+    if (dependencies.safety) await registerSafetyRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, ...dependencies.safety });
   }
 
   app.setNotFoundHandler((request, reply) => reply.code(404).send({
@@ -104,6 +114,9 @@ export async function buildApp(dependencies?: AppDependencies) {
       error: { code: 'VERSION_CONFLICT', message: 'The audio upload is unavailable or already used.', requestId: request.id, details: {} },
     });
     if (error instanceof TimeWorkflowError) return reply.code(409).send({
+      error: { code: 'VERSION_CONFLICT', message: error.message, requestId: request.id, details: {} },
+    });
+    if (error instanceof SafetyWorkflowError) return reply.code(409).send({
       error: { code: 'VERSION_CONFLICT', message: error.message, requestId: request.id, details: {} },
     });
     const candidateStatus = error instanceof Error && 'statusCode' in error

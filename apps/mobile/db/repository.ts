@@ -239,6 +239,7 @@ export class VoiceForgeRepository {
       await this.writeAudit('safety_report', report.id, report.sourceVoiceLogId ? 'confirmed' : 'created', report.sourceVoiceLogId, {
         severity: report.severity, type: report.type,
       });
+      await this.queueSafetyReport(report);
     });
   }
 
@@ -274,6 +275,24 @@ export class VoiceForgeRepository {
     await queueMutation(this.db, {
       mutationId: uuidv7(), workspaceId, deviceId, entityType: 'time_entry', entityId: entry.id,
       operation, baseVersion, payload,
+    });
+  }
+
+  private async queueSafetyReport(report: SafetyReport): Promise<void> {
+    const workspaceId = await this.getSetting<string | null>('active_workspace_id', null);
+    if (!workspaceId || !isUuid(workspaceId) || !isUuid(report.id) || !isUuid(report.jobId)) return;
+    let deviceId = await this.getSetting<string | null>('device_id', null);
+    if (!deviceId || !isUuid(deviceId)) {
+      deviceId = uuidv7();
+      await this.setSetting('device_id', deviceId);
+    }
+    await queueMutation(this.db, {
+      mutationId: uuidv7(), workspaceId, deviceId, entityType: 'safety_report', entityId: report.id,
+      operation: 'create', baseVersion: 0,
+      payload: {
+        jobId: report.jobId, severity: report.severity, reportType: report.type,
+        description: report.description, occurredAt: new Date(`${report.date}T12:00:00`).toISOString(),
+      },
     });
   }
 

@@ -37,6 +37,10 @@ export const transcriptionStatus = pgEnum('transcription_status', ['queued', 'pr
 export const clockSessionStatus = pgEnum('clock_session_status', ['active', 'completed', 'cancelled']);
 export const timeEntryStatus = pgEnum('time_entry_status', ['draft', 'submitted', 'approved', 'rejected', 'correction_requested']);
 export const timeApprovalDecision = pgEnum('time_approval_decision', ['pending', 'approved', 'rejected', 'correction_requested', 'superseded']);
+export const safetyReportStatus = pgEnum('safety_report_status', ['draft', 'submitted', 'acknowledged', 'investigating', 'mitigated', 'closed']);
+export const safetySeverity = pgEnum('safety_severity', ['low', 'medium', 'high', 'critical']);
+export const deliveryChannel = pgEnum('delivery_channel', ['push', 'email']);
+export const deliveryStatus = pgEnum('delivery_status', ['queued', 'sent', 'failed', 'suppressed', 'dead_letter']);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey(),
@@ -64,6 +68,16 @@ export const devices = pgTable('devices', {
   ...timestamps(),
 });
 
+export const pushTokens = pgTable('push_tokens', {
+  id: uuid('id').primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  deviceId: uuid('device_id').notNull().references(() => devices.id, { onDelete: 'cascade' }),
+  expoToken: text('expo_token').notNull(),
+  enabled: boolean('enabled').notNull().default(true),
+  lastError: text('last_error'),
+  ...timestamps(),
+}, (table) => [uniqueIndex('push_tokens_expo_unique').on(table.expoToken), index('push_tokens_user_idx').on(table.userId, table.enabled)]);
+
 export const workspaces = pgTable('workspaces', {
   id: uuid('id').primaryKey(),
   kind: workspaceKind('kind').notNull(),
@@ -73,6 +87,24 @@ export const workspaces = pgTable('workspaces', {
   currentChangeSequence: bigint('current_change_sequence', { mode: 'number' }).notNull().default(0),
   ...timestamps(),
 }, (table) => [uniqueIndex('workspaces_slug_unique').on(table.slug)]);
+
+export const workspacePolicies = pgTable('workspace_policies', {
+  workspaceId: uuid('workspace_id').primaryKey().references(() => workspaces.id, { onDelete: 'cascade' }),
+  safetyAcknowledgementSlaMinutes: integer('safety_acknowledgement_sla_minutes').notNull().default(15),
+  safetyEscalationRepeatMinutes: integer('safety_escalation_repeat_minutes').notNull().default(15),
+  emergencyInstructions: text('emergency_instructions').notNull().default('If anyone is in immediate danger, contact local emergency services now.'),
+  ...timestamps(),
+});
+
+export const safetyEscalationContacts = pgTable('safety_escalation_contacts', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  email: text('email'),
+  escalationOrder: integer('escalation_order').notNull(),
+  enabled: boolean('enabled').notNull().default(true),
+  ...timestamps(),
+}, (table) => [uniqueIndex('safety_contacts_order_unique').on(table.workspaceId, table.escalationOrder)]);
 
 export const workspaceMemberships = pgTable('workspace_memberships', {
   workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
@@ -200,6 +232,81 @@ export const timeApprovals = pgTable('time_approvals', {
   decidedAt: timestamp('decided_at', { withTimezone: true }),
   ...timestamps(),
 }, (table) => [index('time_approvals_workspace_decision_idx').on(table.workspaceId, table.decision, table.createdAt)]);
+
+export const safetyReports = pgTable('safety_reports', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  reporterUserId: uuid('reporter_user_id').notNull().references(() => users.id),
+  jobId: uuid('job_id').notNull().references(() => jobs.id, { onDelete: 'restrict' }),
+  status: safetyReportStatus('status').notNull().default('draft'),
+  severity: safetySeverity('severity').notNull(),
+  currentRevisionNumber: integer('current_revision_number').notNull().default(1),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }),
+  acknowledgementDueAt: timestamp('acknowledgement_due_at', { withTimezone: true }),
+  acknowledgedAt: timestamp('acknowledged_at', { withTimezone: true }),
+  escalationLevel: integer('escalation_level').notNull().default(0),
+  nextEscalationAt: timestamp('next_escalation_at', { withTimezone: true }),
+  escalationSilencedAt: timestamp('escalation_silenced_at', { withTimezone: true }),
+  escalationSilencedBy: uuid('escalation_silenced_by').references(() => users.id),
+  escalationSilenceReason: text('escalation_silence_reason'),
+  ...syncMetadata(),
+}, (table) => [index('safety_reports_triage_idx').on(table.workspaceId, table.status, table.severity, table.nextEscalationAt)]);
+
+export const safetyRevisions = pgTable('safety_revisions', {
+  safetyReportId: uuid('safety_report_id').notNull().references(() => safetyReports.id, { onDelete: 'restrict' }),
+  revisionNumber: integer('revision_number').notNull(),
+  reportType: text('report_type').notNull(),
+  description: text('description').notNull(),
+  location: text('location'),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+  correctionReason: text('correction_reason'),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.safetyReportId, table.revisionNumber] })]);
+
+export const safetyAssignments = pgTable('safety_assignments', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  safetyReportId: uuid('safety_report_id').notNull().references(() => safetyReports.id, { onDelete: 'cascade' }),
+  assignedTo: uuid('assigned_to').notNull().references(() => users.id),
+  assignedBy: uuid('assigned_by').notNull().references(() => users.id),
+  active: boolean('active').notNull().default(true),
+  ...timestamps(),
+}, (table) => [index('safety_assignments_report_idx').on(table.workspaceId, table.safetyReportId, table.active)]);
+
+export const safetyAcknowledgements = pgTable('safety_acknowledgements', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  safetyReportId: uuid('safety_report_id').notNull().references(() => safetyReports.id, { onDelete: 'restrict' }),
+  acknowledgedBy: uuid('acknowledged_by').notNull().references(() => users.id),
+  note: text('note'),
+  acknowledgedAt: timestamp('acknowledged_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index('safety_acknowledgements_report_idx').on(table.workspaceId, table.safetyReportId)]);
+
+export const notificationDeliveries = pgTable('notification_deliveries', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  safetyReportId: uuid('safety_report_id').references(() => safetyReports.id, { onDelete: 'set null' }),
+  recipientUserId: uuid('recipient_user_id').references(() => users.id),
+  channel: deliveryChannel('channel').notNull(),
+  destination: text('destination').notNull(),
+  eventType: text('event_type').notNull(),
+  status: deliveryStatus('status').notNull().default('queued'),
+  attemptCount: integer('attempt_count').notNull().default(0),
+  providerMessageId: text('provider_message_id'),
+  lastError: text('last_error'),
+  sentAt: timestamp('sent_at', { withTimezone: true }),
+  ...timestamps(),
+}, (table) => [index('notification_deliveries_status_idx').on(table.workspaceId, table.status, table.createdAt)]);
+
+export const emailDeliveries = pgTable('email_deliveries', {
+  id: uuid('id').primaryKey(),
+  notificationDeliveryId: uuid('notification_delivery_id').notNull().references(() => notificationDeliveries.id, { onDelete: 'cascade' }),
+  sesMessageId: text('ses_message_id'),
+  subject: text('subject').notNull(),
+  templateName: text('template_name').notNull(),
+  ...timestamps(),
+});
 
 export const workspaceChanges = pgTable('workspace_changes', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),

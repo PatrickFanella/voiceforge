@@ -91,7 +91,9 @@
       "version": "0.1.0",
       "dependencies": {
         "@aws-sdk/client-s3": "^3.940.0",
+        "@aws-sdk/client-sesv2": "^3.940.0",
         "@voiceforge/database": "workspace:*",
+        "@voiceforge/notifications": "workspace:*",
         "@voiceforge/transcription": "workspace:*",
         "bullmq": "^5.66.4",
       },
@@ -139,6 +141,18 @@
         "vitest": "^3.2.4",
       },
     },
+    "packages/notifications": {
+      "name": "@voiceforge/notifications",
+      "version": "0.1.0",
+      "dependencies": {
+        "@aws-sdk/client-sesv2": "^3.940.0",
+      },
+      "devDependencies": {
+        "@types/node": "^24.10.1",
+        "typescript": "~5.9.2",
+        "vitest": "^3.2.4",
+      },
+    },
     "packages/sync": {
       "name": "@voiceforge/sync",
       "version": "0.1.0",
@@ -174,6 +188,8 @@
     "@aws-sdk/checksums": ["@aws-sdk/checksums@3.1000.16", "", { "dependencies": { "@aws-sdk/core": "^3.975.1", "@aws-sdk/types": "^3.974.0", "@smithy/core": "^3.29.2", "@smithy/types": "^4.16.0", "tslib": "^2.6.2" } }, "sha512-EKnvkXSmz3IpA99tCNuI+dLFXyZyClSm8zns9sB/elvkU+MTuomAs6toJMPMBf98/fICG/urXDkzGz0/c3yyAQ=="],
 
     "@aws-sdk/client-s3": ["@aws-sdk/client-s3@3.1085.0", "", { "dependencies": { "@aws-sdk/checksums": "^3.1000.16", "@aws-sdk/core": "^3.975.1", "@aws-sdk/credential-provider-node": "^3.972.66", "@aws-sdk/middleware-sdk-s3": "^3.972.62", "@aws-sdk/signature-v4-multi-region": "^3.996.39", "@aws-sdk/types": "^3.974.0", "@smithy/core": "^3.29.2", "@smithy/fetch-http-handler": "^5.6.4", "@smithy/node-http-handler": "^4.9.4", "@smithy/types": "^4.16.0", "tslib": "^2.6.2" } }, "sha512-O0xe8sR50AYkwxlvRRsV0qytEO2dtXQTQ1CF3YBBdE5xtVkbu27H0vGa1mjQi1/+fbYM80AWEIPai5jZmXyubw=="],
+
+    "@aws-sdk/client-sesv2": ["@aws-sdk/client-sesv2@3.1085.0", "", { "dependencies": { "@aws-sdk/core": "^3.975.1", "@aws-sdk/credential-provider-node": "^3.972.66", "@aws-sdk/signature-v4-multi-region": "^3.996.39", "@aws-sdk/types": "^3.974.0", "@smithy/core": "^3.29.2", "@smithy/fetch-http-handler": "^5.6.4", "@smithy/node-http-handler": "^4.9.4", "@smithy/types": "^4.16.0", "tslib": "^2.6.2" } }, "sha512-bB+ohCYDGKf7e0edGVMLXD4nTaI+sEdWxuAejfKaYU0R0ibV2Bje4ymZ/YtjnX+RfABPkMLfm87iZddQgUaU7w=="],
 
     "@aws-sdk/core": ["@aws-sdk/core@3.975.1", "", { "dependencies": { "@aws-sdk/types": "^3.974.0", "@aws-sdk/xml-builder": "^3.972.34", "@aws/lambda-invoke-store": "^0.3.0", "@smithy/core": "^3.29.2", "@smithy/signature-v4": "^5.6.3", "@smithy/types": "^4.16.0", "bowser": "^2.11.0", "tslib": "^2.6.2" } }, "sha512-8qh/6EYb7hl/ZwVfQufhbMEZs1gQIc7GbdrIf4eprQJ7cv042+74nE6l3YDfyWNzb9iPXb8fRyYSHkNIk5eE6Q=="],
 
@@ -956,6 +972,8 @@
     "@voiceforge/database": ["@voiceforge/database@workspace:packages/database"],
 
     "@voiceforge/mobile": ["@voiceforge/mobile@workspace:apps/mobile"],
+
+    "@voiceforge/notifications": ["@voiceforge/notifications@workspace:packages/notifications"],
 
     "@voiceforge/sync": ["@voiceforge/sync@workspace:packages/sync"],
 

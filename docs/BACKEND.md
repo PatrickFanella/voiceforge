@@ -16,6 +16,7 @@ VoiceForge is being implemented as a contract-first TypeScript platform. Node.js
 - Workspace-bound signed sync cursors, paginated delta feeds, per-mutation replay/conflict results, and a mobile SQLite outbox that survives network failure and replica rebuilds
 - Private presigned audio uploads, durable transcription jobs, BullMQ retry/recovery workers, and a replaceable Deepgram provider adapter
 - Cross-midnight clock sessions, immutable time revisions, team approval/correction queues, owner adjustments, and versioned JSON/CSV evidence exports
+- Revision-based safety triage, configurable acknowledgement SLAs, on-call escalation, mandatory critical push/email delivery, retries, and dead-letter diagnostics
 
 The schema is intentionally expanded milestone by milestone. Workflow tables for voice, time approval, safety triage, billing, notifications, exports, webhooks, retention, and legal holds are added with their corresponding domain behavior rather than as unused placeholders.
 
@@ -40,6 +41,8 @@ Mobile synchronization always pushes its outbox before pulling deltas. Pull chan
 Audio uploads are signed for fifteen minutes and bind content type and length. AWS deployments additionally require SSE-S3; local MinIO omits that unsupported development header. Workers validate stored type and length before invoking the provider, retry transient failures with exponential backoff, mark exhausted or invalid jobs failed, and periodically recover durable queued rows missing from Redis. Completion and manual transcript review enter the workspace change feed. A transcript never creates time or safety evidence automatically.
 
 Time entries preserve every submitted correction as a numbered revision. Team submissions create a pending approval; supervisors may approve, reject with a reason, or request correction. Workers correct into a new draft revision and resubmit. Approved evidence changes only through a reason-bearing owner adjustment, which creates another revision and approval record. Personal workspaces self-finalize without entering the team approval workflow. Offline mobile drafts can sync, but submission and decisions remain server-authoritative.
+
+Safety reports follow `draft → submitted → acknowledged → investigating → mitigated → closed`. Critical submissions enqueue immediately; other severities become due at the workspace acknowledgement SLA. Escalation advances through configured contacts and repeats until acknowledgement or an owner/admin records a silence reason. Push and email attempts share a durable delivery ledger, retry with exponential delay, and dead-letter after five failures. Notification copy includes emergency-service instructions and intentionally excludes report narrative. VoiceForge is not an emergency service.
 
 ## Migration policy
 

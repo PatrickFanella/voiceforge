@@ -22,6 +22,13 @@
       "when": 1783873892802,
       "tag": "0002_hard_hercules",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783874739298,
+      "tag": "0003_far_nightmare",
+      "breakpoints": true
     }
   ]
 }

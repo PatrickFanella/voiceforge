@@ -1,6 +1,6 @@
 import { AuthorizationError, requirePermission, type TokenVerifier } from '@voiceforge/auth';
 import { IdempotencyKeyHeader, SyncPullResponse, SyncPushBody, SyncPushResponse, type SyncPushBody as SyncPushInput } from '@voiceforge/contracts';
-import { VersionConflictError, type JobRepository, type SyncRepository, type TimeRepository } from '@voiceforge/database';
+import { VersionConflictError, type JobRepository, type SafetyRepository, type SyncRepository, type TimeRepository } from '@voiceforge/database';
 import { decodeCursor, encodeCursor } from '@voiceforge/sync';
 import type { FastifyInstance } from 'fastify';
 import { identityFor, type TenancyStore } from './tenancy.js';
@@ -11,6 +11,7 @@ export async function registerSyncRoutes(app: FastifyInstance, dependencies: {
   jobs: Pick<JobRepository, 'create' | 'update' | 'delete'>;
   sync: Pick<SyncRepository, 'pull'>;
   time?: Pick<TimeRepository, 'createDraft' | 'editDraft'>;
+  safety?: Pick<SafetyRepository, 'createDraft'>;
   cursorSecret: string;
 }) {
   app.get<{ Querystring: { workspaceId: string; cursor?: string }; Reply: { cursor: string; hasMore: boolean; changes: Awaited<ReturnType<SyncRepository['pull']>>['changes'] } }>('/v1/sync/pull', {
@@ -43,7 +44,20 @@ export async function registerSyncRoutes(app: FastifyInstance, dependencies: {
     for (const mutation of request.body.mutations) {
       try {
         let result: { version: number };
-        if (mutation.entityType === 'time_entry') {
+        if (mutation.entityType === 'safety_report') {
+          if (!dependencies.safety || mutation.operation !== 'create') throw new Error('Unsupported safety mutation.');
+          const payload = mutation.payload;
+          if (typeof payload.jobId !== 'string' || typeof payload.severity !== 'string' || typeof payload.reportType !== 'string' || typeof payload.description !== 'string' || typeof payload.occurredAt !== 'string') {
+            throw new Error('Safety mutation payload is invalid.');
+          }
+          result = await dependencies.safety.createDraft({
+            workspaceId: access.id, actorUserId: session.user.id, idempotencyKey: mutation.mutationId,
+            id: mutation.entityId, jobId: payload.jobId,
+            severity: payload.severity as 'low' | 'medium' | 'high' | 'critical', reportType: payload.reportType,
+            description: payload.description, ...(typeof payload.location === 'string' ? { location: payload.location } : {}),
+            occurredAt: new Date(payload.occurredAt),
+          });
+        } else if (mutation.entityType === 'time_entry') {
           if (!dependencies.time || mutation.operation === 'delete') throw new Error('Unsupported time mutation.');
           const payload = mutation.payload;
           const jobId = payload.jobId;

@@ -1,5 +1,5 @@
 import { createAuth0TokenVerifier } from '@voiceforge/auth';
-import { createDatabase, JobRepository, SyncRepository, TenancyRepository, TimeRepository, TranscriptionRepository } from '@voiceforge/database';
+import { createDatabase, JobRepository, SafetyRepository, SyncRepository, TenancyRepository, TimeRepository, TranscriptionRepository } from '@voiceforge/database';
 import { S3Client } from '@aws-sdk/client-s3';
 import { Queue, type ConnectionOptions } from 'bullmq';
 import { buildApp } from './app.js';
@@ -19,6 +19,7 @@ const connection: ConnectionOptions = {
   ...(redisUrl.protocol === 'rediss:' ? { tls: {} } : {}),
 };
 const transcriptionQueue = new Queue<{ jobId: string }, void, 'transcribe'>('voiceforge-transcription', { connection });
+const safetyQueue = new Queue<{ reportId: string }, void, 'escalate'>('voiceforge-safety', { connection });
 const s3 = new S3Client({
   region: process.env.AWS_REGION ?? 'us-east-1',
   ...(process.env.S3_ENDPOINT ? { endpoint: process.env.S3_ENDPOINT, forcePathStyle: true } : {}),
@@ -40,11 +41,18 @@ const app = await buildApp({
     },
   },
   time: new TimeRepository(database.db),
+  safety: {
+    repository: new SafetyRepository(database.db),
+    queue: { enqueue: async (reportId, at) => { await safetyQueue.add('escalate', { reportId }, {
+      jobId: `safety-${reportId}-${Math.floor(at.getTime() / 60_000)}`,
+      delay: Math.max(0, at.getTime() - Date.now()), attempts: 5, backoff: { type: 'exponential', delay: 2_000 }, removeOnComplete: 1_000,
+    }); } },
+  },
 });
 const port = Number.parseInt(process.env.PORT ?? '3000', 10);
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(signal, () => void app.close().then(() => transcriptionQueue.close()).then(database.close).finally(() => process.exit(0)));
+  process.on(signal, () => void app.close().then(() => Promise.all([transcriptionQueue.close(), safetyQueue.close()])).then(database.close).finally(() => process.exit(0)));
 }
 
 await app.listen({ host: '0.0.0.0', port });

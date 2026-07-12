@@ -95,4 +95,23 @@ describe('mobile synchronization replica', () => {
     expect(pending).toHaveLength(1);
     expect(pending[0]).toMatchObject({ entityType: 'time_entry', operation: 'create', baseVersion: 0, payload: { notes: 'Edited offline' } });
   });
+
+  it('queues an offline safety draft but does not submit or triage it locally', async () => {
+    const repository = new VoiceForgeRepository(database);
+    const safetyId = '01980f58-9b8d-7000-8000-000000000028';
+    await database.runAsync(
+      `INSERT INTO jobs
+       (id, title, client, address, status, trade, priority, start_date, due_date, hours_logged, hours_estimated, notes_json, crew_json, created_at, updated_at, workspace_id)
+       VALUES (?, 'Server job', '', '', 'active', '', 'medium', '2026-07-12', '2026-07-12', 0, 0, '[]', '[]', ?, ?, ?)`,
+      entityId, '2026-07-12T00:00:00Z', '2026-07-12T00:00:00Z', workspaceId,
+    );
+    await repository.setSetting('active_workspace_id', workspaceId);
+    await repository.addSafetyReport({
+      id: safetyId, jobId: entityId, jobTitle: 'Server job', date: '2026-07-12', type: 'hazard', severity: 'critical',
+      description: 'Exposed conductor', resolved: false, voiceLogged: false,
+    });
+    expect(await getPendingMutations(database, workspaceId)).toEqual([
+      expect.objectContaining({ entityType: 'safety_report', operation: 'create', payload: expect.objectContaining({ severity: 'critical' }) }),
+    ]);
+  });
 });

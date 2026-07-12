@@ -4,7 +4,7 @@ export interface OutboxMutation {
   mutationId: string;
   workspaceId: string;
   deviceId: string;
-  entityType: 'job' | 'time_entry';
+  entityType: 'job' | 'time_entry' | 'safety_report';
   entityId: string;
   operation: 'create' | 'update' | 'delete';
   baseVersion: number;
@@ -135,6 +135,30 @@ export async function applySyncTransaction(
           typeof payload.notes === 'string' ? payload.notes : '',
           typeof payload.createdAt === 'string' ? payload.createdAt : startedAt.toISOString(),
           typeof payload.updatedAt === 'string' ? payload.updatedAt : endedAt.toISOString(), workspaceId, change.version,
+        );
+        continue;
+      }
+      if (change.entityType === 'safety_report' && change.operation === 'upsert') {
+        const payload = change.payload ?? {};
+        if (typeof payload.jobId !== 'string' || typeof payload.occurredAt !== 'string') continue;
+        const job = await db.getFirstAsync<{ title: string }>('SELECT title FROM jobs WHERE id = ? AND workspace_id = ?', payload.jobId, workspaceId);
+        if (!job) continue;
+        const occurredAt = new Date(payload.occurredAt);
+        const status = typeof payload.status === 'string' ? payload.status : 'draft';
+        await db.runAsync(
+          `INSERT INTO safety_reports
+            (id, job_id, job_title, date, type, severity, description, resolved, voice_logged, source_voice_log_id,
+             created_at, updated_at, workspace_id, server_version, sync_status, deleted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?, 'synced', NULL)
+           ON CONFLICT(id) DO UPDATE SET type = excluded.type, severity = excluded.severity, description = excluded.description,
+             resolved = excluded.resolved, updated_at = excluded.updated_at, server_version = excluded.server_version,
+             sync_status = 'synced', deleted_at = NULL`,
+          change.entityId, payload.jobId, job.title, occurredAt.toISOString().slice(0, 10),
+          typeof payload.reportType === 'string' ? payload.reportType : 'hazard',
+          typeof payload.severity === 'string' ? payload.severity : 'medium',
+          typeof payload.description === 'string' ? payload.description : '', status === 'mitigated' || status === 'closed' ? 1 : 0,
+          typeof payload.createdAt === 'string' ? payload.createdAt : occurredAt.toISOString(),
+          typeof payload.updatedAt === 'string' ? payload.updatedAt : occurredAt.toISOString(), workspaceId, change.version,
         );
         continue;
       }

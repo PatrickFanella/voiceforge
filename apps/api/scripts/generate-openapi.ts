@@ -19,6 +19,10 @@ const app = await buildApp({
     storage: { signUpload: unavailable, requiredUploadHeaders: () => ({}), verifyUpload: unavailable }, queue: { enqueue: unavailable },
   },
   time: { startClock: unavailable, stopClock: unavailable, createDraft: unavailable, editDraft: unavailable, submit: unavailable, decide: unavailable, correct: unavailable, listApprovalQueue: unavailable, history: unavailable },
+  safety: {
+    repository: { registerPushToken: unavailable, configurePolicy: unavailable, configureContacts: unavailable, createDraft: unavailable, submit: unavailable, acknowledge: unavailable, transition: unavailable, correct: unavailable, assign: unavailable, silence: unavailable, listTriage: unavailable, listDeliveries: unavailable },
+    queue: { enqueue: unavailable },
+  },
 });
 await app.ready();
 await writeFile(new URL('../openapi.json', import.meta.url), `${JSON.stringify(app.swagger(), null, 2)}\n`);
