@@ -41,7 +41,7 @@ export class VoiceForgeRepository {
   constructor(private readonly db: DatabaseConnection) {}
 
   async getJobs(): Promise<Job[]> {
-    const rows = await this.db.getAllAsync<JobRow>('SELECT * FROM jobs ORDER BY due_date ASC, title ASC');
+    const rows = await this.db.getAllAsync<JobRow>('SELECT * FROM jobs WHERE deleted_at IS NULL ORDER BY due_date ASC, title ASC');
     return rows.map((row) => ({
       id: row.id,
       title: row.title,
@@ -182,7 +182,9 @@ export class VoiceForgeRepository {
     const now = nowIso();
     await this.db.withTransactionAsync(async () => {
       await this.db.runAsync(
-        `INSERT INTO time_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO time_entries
+         (id, job_id, job_title, date, start_time, end_time, hours, type, notes, voice_logged, source_voice_log_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         entry.id, entry.jobId, entry.jobTitle, entry.date, entry.startTime, entry.endTime,
         entry.hours, entry.type, entry.notes, entry.voiceLogged ? 1 : 0,
         entry.sourceVoiceLogId ?? null, now, now,
@@ -197,7 +199,9 @@ export class VoiceForgeRepository {
     const now = nowIso();
     await this.db.withTransactionAsync(async () => {
       await this.db.runAsync(
-        `INSERT INTO time_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO time_entries
+         (id, job_id, job_title, date, start_time, end_time, hours, type, notes, voice_logged, source_voice_log_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         entry.id, entry.jobId, entry.jobTitle, entry.date, entry.startTime, entry.endTime,
         entry.hours, entry.type, entry.notes, 0, null, now, now,
       );
@@ -211,7 +215,9 @@ export class VoiceForgeRepository {
     const now = nowIso();
     await this.db.withTransactionAsync(async () => {
       await this.db.runAsync(
-        `INSERT INTO safety_reports VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO safety_reports
+         (id, job_id, job_title, date, type, severity, description, resolved, voice_logged, source_voice_log_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         report.id, report.jobId, report.jobTitle, report.date, report.type, report.severity,
         report.description, report.resolved ? 1 : 0, report.voiceLogged ? 1 : 0,
         report.sourceVoiceLogId ?? null, now, now,
@@ -313,6 +319,8 @@ export class VoiceForgeRepository {
         DELETE FROM safety_reports;
         DELETE FROM voice_logs;
         DELETE FROM jobs;
+        DELETE FROM sync_outbox;
+        DELETE FROM sync_cursors;
         DELETE FROM settings;
       `);
       await this.setSetting('demo_seeded', true);
@@ -332,7 +340,10 @@ export class VoiceForgeRepository {
       const now = nowIso();
       for (const job of data.jobs) {
         await this.db.runAsync(
-          `INSERT INTO jobs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO jobs
+           (id, title, client, address, status, trade, priority, start_date, due_date, hours_logged, hours_estimated,
+            notes_json, crew_json, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           job.id, job.title, job.client, job.address, job.status, job.trade, job.priority,
           job.startDate, job.dueDate, job.hoursLogged, job.hoursEstimated,
           JSON.stringify(job.notes), JSON.stringify(job.crew), now, now,
@@ -340,7 +351,9 @@ export class VoiceForgeRepository {
       }
       for (const entry of data.timeEntries) {
         await this.db.runAsync(
-          `INSERT INTO time_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO time_entries
+           (id, job_id, job_title, date, start_time, end_time, hours, type, notes, voice_logged, source_voice_log_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           entry.id, entry.jobId, entry.jobTitle, entry.date, entry.startTime, entry.endTime,
           entry.hours, entry.type, entry.notes, entry.voiceLogged ? 1 : 0,
           entry.sourceVoiceLogId ?? null, now, now,
@@ -348,7 +361,9 @@ export class VoiceForgeRepository {
       }
       for (const report of data.safetyReports) {
         await this.db.runAsync(
-          `INSERT INTO safety_reports VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO safety_reports
+           (id, job_id, job_title, date, type, severity, description, resolved, voice_logged, source_voice_log_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           report.id, report.jobId, report.jobTitle, report.date, report.type, report.severity,
           report.description, report.resolved ? 1 : 0, report.voiceLogged ? 1 : 0,
           report.sourceVoiceLogId ?? null, now, now,

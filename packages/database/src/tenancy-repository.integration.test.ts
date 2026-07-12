@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDatabase } from './client.js';
 import { IdempotencyConflictError, JobRepository, VersionConflictError } from './job-repository.js';
 import { TenancyRepository } from './tenancy-repository.js';
+import { SyncRepository } from './sync-repository.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const suite = databaseUrl ? describe : describe.skip;
@@ -11,6 +12,7 @@ suite('TenancyRepository against PostgreSQL', () => {
   const database = createDatabase(databaseUrl ?? 'postgresql://unused');
   const repository = new TenancyRepository(database.db);
   const jobRepository = new JobRepository(database.db);
+  const syncRepository = new SyncRepository(database.db);
 
   beforeAll(async () => {
     await database.db.execute(sql`truncate table invitations, workspace_memberships, identities, users, workspaces cascade`);
@@ -82,6 +84,10 @@ suite('TenancyRepository against PostgreSQL', () => {
     expect(chain[0]?.previous_hash).toBeNull();
     expect(chain[1]?.previous_hash).toBe(chain[0]?.event_hash);
     expect(chain[2]?.previous_hash).toBe(chain[1]?.event_hash);
+    const firstPage = await syncRepository.pull(workspaceId, 0, 2);
+    expect(firstPage).toMatchObject({ hasMore: true, changes: [{ sequence: 1 }, { sequence: 2 }] });
+    const finalPage = await syncRepository.pull(workspaceId, 2, 2);
+    expect(finalPage).toMatchObject({ hasMore: false, changes: [{ sequence: 3, operation: 'delete' }] });
 
     const other = await repository.bootstrapIdentity({ subject: 'auth0|other', email: 'other@example.com' });
     expect(await jobRepository.list(other.personalWorkspaceId)).toEqual([]);

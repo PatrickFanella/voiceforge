@@ -87,6 +87,52 @@ const MIGRATIONS = [
     CREATE INDEX IF NOT EXISTS idx_safety_reports_date ON safety_reports(date);
     CREATE INDEX IF NOT EXISTS idx_voice_logs_timestamp ON voice_logs(timestamp);
   `,
+  `
+    ALTER TABLE jobs ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'local-unassigned';
+    ALTER TABLE jobs ADD COLUMN server_version INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE jobs ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'local';
+    ALTER TABLE jobs ADD COLUMN deleted_at TEXT;
+
+    ALTER TABLE time_entries ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'local-unassigned';
+    ALTER TABLE time_entries ADD COLUMN server_version INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE time_entries ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'local';
+    ALTER TABLE time_entries ADD COLUMN deleted_at TEXT;
+
+    ALTER TABLE safety_reports ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'local-unassigned';
+    ALTER TABLE safety_reports ADD COLUMN server_version INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE safety_reports ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'local';
+    ALTER TABLE safety_reports ADD COLUMN deleted_at TEXT;
+
+    ALTER TABLE voice_logs ADD COLUMN workspace_id TEXT NOT NULL DEFAULT 'local-unassigned';
+    ALTER TABLE voice_logs ADD COLUMN server_version INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE voice_logs ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'local';
+    ALTER TABLE voice_logs ADD COLUMN deleted_at TEXT;
+
+    CREATE TABLE sync_outbox (
+      mutation_id TEXT PRIMARY KEY NOT NULL,
+      workspace_id TEXT NOT NULL,
+      device_id TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      operation TEXT NOT NULL,
+      base_version INTEGER NOT NULL,
+      payload_json TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      conflict_payload_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE sync_cursors (
+      workspace_id TEXT PRIMARY KEY NOT NULL,
+      cursor TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX idx_sync_outbox_workspace_created ON sync_outbox(workspace_id, created_at);
+    CREATE INDEX idx_jobs_workspace_sync ON jobs(workspace_id, sync_status, updated_at);
+  `,
 ] as const;
 
 export async function migrateDatabase(db: DatabaseConnection): Promise<void> {

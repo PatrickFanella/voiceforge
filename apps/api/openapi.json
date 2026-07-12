@@ -1092,6 +1092,281 @@
           }
         }
       }
+    },
+    "/v1/sync/pull": {
+      "get": {
+        "operationId": "pullSyncChanges",
+        "tags": [
+          "sync"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "query",
+            "name": "workspaceId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "cursor",
+                    "hasMore",
+                    "changes"
+                  ],
+                  "properties": {
+                    "cursor": {
+                      "type": "string"
+                    },
+                    "hasMore": {
+                      "type": "boolean"
+                    },
+                    "changes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "sequence",
+                          "entityType",
+                          "entityId",
+                          "operation",
+                          "version",
+                          "payload"
+                        ],
+                        "properties": {
+                          "sequence": {
+                            "type": "integer"
+                          },
+                          "entityType": {
+                            "type": "string"
+                          },
+                          "entityId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "operation": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "upsert"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "delete"
+                                ]
+                              }
+                            ]
+                          },
+                          "version": {
+                            "type": "integer"
+                          },
+                          "payload": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sync/push": {
+      "post": {
+        "operationId": "pushSyncMutations",
+        "tags": [
+          "sync"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "deviceId",
+                  "mutations"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "deviceId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "mutations": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "mutationId",
+                        "entityType",
+                        "entityId",
+                        "operation",
+                        "baseVersion",
+                        "payload"
+                      ],
+                      "properties": {
+                        "mutationId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "entityType": {
+                          "type": "string",
+                          "enum": [
+                            "job"
+                          ]
+                        },
+                        "entityId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "operation": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "create"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "update"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "delete"
+                              ]
+                            }
+                          ]
+                        },
+                        "baseVersion": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "payload": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "minLength": 16,
+              "maxLength": 255,
+              "type": "string"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "results"
+                  ],
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "mutationId",
+                          "entityId",
+                          "status"
+                        ],
+                        "properties": {
+                          "mutationId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "entityId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "applied"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "conflict"
+                                ]
+                              }
+                            ]
+                          },
+                          "version": {
+                            "type": "integer"
+                          },
+                          "errorCode": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "servers": [

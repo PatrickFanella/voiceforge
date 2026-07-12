@@ -1,5 +1,5 @@
 import { createAuth0TokenVerifier } from '@voiceforge/auth';
-import { createDatabase, JobRepository, TenancyRepository } from '@voiceforge/database';
+import { createDatabase, JobRepository, SyncRepository, TenancyRepository } from '@voiceforge/database';
 import { buildApp } from './app.js';
 
 const required = (name: string) => {
@@ -12,6 +12,8 @@ const app = await buildApp({
   verifier: createAuth0TokenVerifier({ issuer: required('AUTH0_ISSUER'), audience: required('AUTH0_AUDIENCE') }),
   tenancy: new TenancyRepository(database.db),
   jobs: new JobRepository(database.db),
+  sync: new SyncRepository(database.db),
+  cursorSecret: required('SYNC_CURSOR_SECRET'),
 });
 const port = Number.parseInt(process.env.PORT ?? '3000', 10);
 

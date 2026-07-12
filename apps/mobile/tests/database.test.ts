@@ -65,7 +65,9 @@ describe('VoiceForge database', () => {
   it('rejects time entries for a missing job', async () => {
     await expect(
       database.runAsync(
-        `INSERT INTO time_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO time_entries
+         (id, job_id, job_title, date, start_time, end_time, hours, type, notes, voice_logged, source_voice_log_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         't-missing', 'missing', 'Missing', '2026-07-12', '08:00', '09:00', 1,
         'regular', 'Invalid', 0, null, new Date().toISOString(), new Date().toISOString(),
       ),

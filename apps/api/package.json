@@ -20,6 +20,7 @@
     "@voiceforge/contracts": "workspace:*",
     "@voiceforge/auth": "workspace:*",
     "@voiceforge/database": "workspace:*",
+    "@voiceforge/sync": "workspace:*",
     "fastify": "^5.6.2"
   },
   "devDependencies": {

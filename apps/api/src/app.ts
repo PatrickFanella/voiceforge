@@ -3,15 +3,19 @@ import swaggerUi from '@fastify/swagger-ui';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { AuthenticationError, AuthorizationError, type TokenVerifier } from '@voiceforge/auth';
 import { HealthResponse } from '@voiceforge/contracts';
-import { EntityNotFoundError, IdempotencyConflictError, VersionConflictError, type JobRepository, type TenancyRepository } from '@voiceforge/database';
+import { EntityNotFoundError, IdempotencyConflictError, VersionConflictError, type JobRepository, type SyncRepository, type TenancyRepository } from '@voiceforge/database';
+import { InvalidCursorError } from '@voiceforge/sync';
 import Fastify from 'fastify';
 import { registerTenancyRoutes } from './routes/tenancy.js';
 import { registerJobRoutes } from './routes/jobs.js';
+import { registerSyncRoutes } from './routes/sync.js';
 
 export interface AppDependencies {
   verifier: TokenVerifier;
   tenancy: Pick<TenancyRepository, 'bootstrapIdentity' | 'createTeam' | 'getAccess' | 'createInvitation' | 'acceptInvitation'>;
   jobs?: Pick<JobRepository, 'list' | 'create' | 'update' | 'delete'>;
+  sync?: Pick<SyncRepository, 'pull'>;
+  cursorSecret?: string;
 }
 
 export async function buildApp(dependencies?: AppDependencies) {
@@ -42,6 +46,10 @@ export async function buildApp(dependencies?: AppDependencies) {
   if (dependencies) {
     await registerTenancyRoutes(app, { verifier: dependencies.verifier, store: dependencies.tenancy });
     if (dependencies.jobs) await registerJobRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, jobs: dependencies.jobs });
+    if (dependencies.jobs && dependencies.sync && dependencies.cursorSecret) await registerSyncRoutes(app, {
+      verifier: dependencies.verifier, tenancy: dependencies.tenancy, jobs: dependencies.jobs,
+      sync: dependencies.sync, cursorSecret: dependencies.cursorSecret,
+    });
   }
 
   app.setNotFoundHandler((request, reply) => reply.code(404).send({
@@ -69,6 +77,9 @@ export async function buildApp(dependencies?: AppDependencies) {
     });
     if (error instanceof IdempotencyConflictError) return reply.code(409).send({
       error: { code: 'IDEMPOTENCY_CONFLICT', message: 'The idempotency key conflicts with another request.', requestId: request.id, details: {} },
+    });
+    if (error instanceof InvalidCursorError) return reply.code(400).send({
+      error: { code: 'BAD_REQUEST', message: 'The synchronization cursor is invalid.', requestId: request.id, details: {} },
     });
     const candidateStatus = error instanceof Error && 'statusCode' in error
       ? Number(error.statusCode)
