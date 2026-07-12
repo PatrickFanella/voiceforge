@@ -19,7 +19,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 export type TenancyStore = Pick<TenancyRepository, 'bootstrapIdentity' | 'createTeam' | 'getAccess' | 'createInvitation' | 'acceptInvitation'>;
 
-async function identityFor(request: FastifyRequest, verifier: TokenVerifier, store: TenancyStore) {
+export async function identityFor(request: FastifyRequest, verifier: TokenVerifier, store: TenancyStore) {
   const authorization = request.headers.authorization;
   if (!authorization?.startsWith('Bearer ')) throw new AuthenticationError('Bearer token required.');
   const identity = await verifier.verify(authorization.slice('Bearer '.length));

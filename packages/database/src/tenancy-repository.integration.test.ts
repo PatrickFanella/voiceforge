@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDatabase } from './client.js';
+import { IdempotencyConflictError, JobRepository, VersionConflictError } from './job-repository.js';
 import { TenancyRepository } from './tenancy-repository.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -9,6 +10,7 @@ const suite = databaseUrl ? describe : describe.skip;
 suite('TenancyRepository against PostgreSQL', () => {
   const database = createDatabase(databaseUrl ?? 'postgresql://unused');
   const repository = new TenancyRepository(database.db);
+  const jobRepository = new JobRepository(database.db);
 
   beforeAll(async () => {
     await database.db.execute(sql`truncate table invitations, workspace_memberships, identities, users, workspaces cascade`);
@@ -36,5 +38,75 @@ suite('TenancyRepository against PostgreSQL', () => {
     expect(membership).toMatchObject({ id: team.id, role: 'worker', kind: 'team' });
     await expect(repository.acceptInvitation({ token: invitation.token, userId: worker.user.id, email: 'worker@example.com' }))
       .rejects.toThrow('invalid or expired');
+  });
+
+  it('scopes versioned jobs and atomically records replay, changes, tombstones, and chained audit evidence', async () => {
+    const actor = await repository.bootstrapIdentity({ subject: 'auth0|job-owner', email: 'jobs@example.com' });
+    const workspaceId = actor.personalWorkspaceId;
+    const id = crypto.randomUUID();
+    const created = await jobRepository.create({
+      workspaceId, actorUserId: actor.user.id, idempotencyKey: 'job-create-00000001', id, name: 'Tower retrofit',
+    });
+    const replay = await jobRepository.create({
+      workspaceId, actorUserId: actor.user.id, idempotencyKey: 'job-create-00000001', id, name: 'Tower retrofit',
+    });
+    expect(replay).toEqual(created);
+    await expect(jobRepository.create({
+      workspaceId, actorUserId: actor.user.id, idempotencyKey: 'job-create-00000001', id: crypto.randomUUID(), name: 'Different request',
+    })).rejects.toBeInstanceOf(IdempotencyConflictError);
+
+    const updated = await jobRepository.update({
+      workspaceId, actorUserId: actor.user.id, idempotencyKey: 'job-update-00000001', id, baseVersion: 1,
+      changes: { name: 'Tower retrofit phase 2' },
+    });
+    expect(updated.version).toBe(2);
+    await expect(jobRepository.update({
+      workspaceId, actorUserId: actor.user.id, idempotencyKey: 'job-update-stale-01', id, baseVersion: 1,
+      changes: { name: 'Stale edit' },
+    })).rejects.toBeInstanceOf(VersionConflictError);
+
+    const deleted = await jobRepository.delete({
+      workspaceId, actorUserId: actor.user.id, idempotencyKey: 'job-delete-00000001', id, baseVersion: 2,
+    });
+    expect(deleted.version).toBe(3);
+    expect(await jobRepository.list(workspaceId)).toEqual([]);
+
+    const evidence = await database.db.execute(sql`
+      select
+        (select count(*)::int from workspace_changes where workspace_id = ${workspaceId}) as changes,
+        (select count(*)::int from audit_events where workspace_id = ${workspaceId}) as audits,
+        (select count(*)::int from entity_tombstones where workspace_id = ${workspaceId} and entity_id = ${id}) as tombstones
+    `);
+    expect(evidence[0]).toMatchObject({ changes: 3, audits: 3, tombstones: 1 });
+    const chain = await database.db.execute(sql`select previous_hash, event_hash from audit_events where workspace_id = ${workspaceId} order by sequence`);
+    expect(chain[0]?.previous_hash).toBeNull();
+    expect(chain[1]?.previous_hash).toBe(chain[0]?.event_hash);
+    expect(chain[2]?.previous_hash).toBe(chain[1]?.event_hash);
+
+    const other = await repository.bootstrapIdentity({ subject: 'auth0|other', email: 'other@example.com' });
+    expect(await jobRepository.list(other.personalWorkspaceId)).toEqual([]);
+  });
+
+  it('rolls back the entity, change feed, and idempotency record when audit persistence fails', async () => {
+    const actor = await repository.bootstrapIdentity({ subject: 'auth0|rollback', email: 'rollback@example.com' });
+    const id = crypto.randomUUID();
+    await database.db.execute(sql`create or replace function reject_voiceforge_audit() returns trigger language plpgsql as $$ begin raise exception 'audit rejected'; end $$`);
+    await database.db.execute(sql`create trigger reject_voiceforge_audit before insert on audit_events for each row execute function reject_voiceforge_audit()`);
+    try {
+      await expect(jobRepository.create({
+        workspaceId: actor.personalWorkspaceId, actorUserId: actor.user.id,
+        idempotencyKey: 'job-rollback-000001', id, name: 'Must roll back',
+      })).rejects.toThrow('insert into "audit_events"');
+    } finally {
+      await database.db.execute(sql`drop trigger reject_voiceforge_audit on audit_events`);
+      await database.db.execute(sql`drop function reject_voiceforge_audit()`);
+    }
+    const residue = await database.db.execute(sql`
+      select
+        (select count(*)::int from jobs where id = ${id}) as jobs,
+        (select count(*)::int from workspace_changes where entity_id = ${id}) as changes,
+        (select count(*)::int from idempotency_keys where workspace_id = ${actor.personalWorkspaceId} and key = 'job-rollback-000001') as keys
+    `);
+    expect(residue[0]).toMatchObject({ jobs: 0, changes: 0, keys: 0 });
   });
 });

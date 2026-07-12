@@ -3,13 +3,15 @@ import swaggerUi from '@fastify/swagger-ui';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { AuthenticationError, AuthorizationError, type TokenVerifier } from '@voiceforge/auth';
 import { HealthResponse } from '@voiceforge/contracts';
-import type { TenancyRepository } from '@voiceforge/database';
+import { EntityNotFoundError, IdempotencyConflictError, VersionConflictError, type JobRepository, type TenancyRepository } from '@voiceforge/database';
 import Fastify from 'fastify';
 import { registerTenancyRoutes } from './routes/tenancy.js';
+import { registerJobRoutes } from './routes/jobs.js';
 
 export interface AppDependencies {
   verifier: TokenVerifier;
   tenancy: Pick<TenancyRepository, 'bootstrapIdentity' | 'createTeam' | 'getAccess' | 'createInvitation' | 'acceptInvitation'>;
+  jobs?: Pick<JobRepository, 'list' | 'create' | 'update' | 'delete'>;
 }
 
 export async function buildApp(dependencies?: AppDependencies) {
@@ -37,7 +39,10 @@ export async function buildApp(dependencies?: AppDependencies) {
     timestamp: new Date().toISOString(),
   }));
 
-  if (dependencies) await registerTenancyRoutes(app, { verifier: dependencies.verifier, store: dependencies.tenancy });
+  if (dependencies) {
+    await registerTenancyRoutes(app, { verifier: dependencies.verifier, store: dependencies.tenancy });
+    if (dependencies.jobs) await registerJobRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, jobs: dependencies.jobs });
+  }
 
   app.setNotFoundHandler((request, reply) => reply.code(404).send({
     error: {
@@ -55,6 +60,15 @@ export async function buildApp(dependencies?: AppDependencies) {
     });
     if (error instanceof AuthorizationError) return reply.code(403).send({
       error: { code: 'FORBIDDEN', message: 'You do not have permission to perform this action.', requestId: request.id, details: {} },
+    });
+    if (error instanceof EntityNotFoundError) return reply.code(404).send({
+      error: { code: 'NOT_FOUND', message: 'The requested resource was not found.', requestId: request.id, details: {} },
+    });
+    if (error instanceof VersionConflictError) return reply.code(409).send({
+      error: { code: 'VERSION_CONFLICT', message: 'The record changed on another device.', requestId: request.id, details: {} },
+    });
+    if (error instanceof IdempotencyConflictError) return reply.code(409).send({
+      error: { code: 'IDEMPOTENCY_CONFLICT', message: 'The idempotency key conflicts with another request.', requestId: request.id, details: {} },
     });
     const candidateStatus = error instanceof Error && 'statusCode' in error
       ? Number(error.statusCode)

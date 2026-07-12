@@ -11,6 +11,7 @@ const app = await buildApp({
     createInvitation: unavailable,
     acceptInvitation: unavailable,
   },
+  jobs: { list: unavailable, create: unavailable, update: unavailable, delete: unavailable },
 });
 await app.ready();
 await writeFile(new URL('../openapi.json', import.meta.url), `${JSON.stringify(app.swagger(), null, 2)}\n`);

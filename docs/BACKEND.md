@@ -12,6 +12,7 @@ VoiceForge is being implemented as a contract-first TypeScript platform. Node.js
 - Auth0 RS256 access-token validation with strict issuer, audience, algorithm, and expiry checks
 - Idempotent first-login creation of one private personal workspace, protected by a PostgreSQL advisory transaction lock
 - Team creation, workspace-scoped role policies, opaque invitation tokens stored only as SHA-256 digests, and transactional invitation acceptance
+- Workspace-scoped job CRUD with optimistic versions, tombstones, monotonic change-feed records, idempotent mutation replay, and hash-chained audit events in one PostgreSQL transaction
 
 The schema is intentionally expanded milestone by milestone. Workflow tables for voice, time approval, safety triage, billing, notifications, exports, webhooks, retention, and legal holds are added with their corresponding domain behavior rather than as unused placeholders.
 
@@ -28,6 +29,8 @@ bun run --cwd apps/api dev
 The API listens on port 3000 by default. OpenAPI UI is at `/documentation`; the machine-readable committed contract is `apps/api/openapi.json`.
 
 Auth0 supplies identity only. Roles, invitations, memberships, and workspace access are loaded from PostgreSQL on protected requests. A matching email address does not implicitly link two Auth0 subjects; account linking must occur in Auth0 and produce the canonical subject. Invitation acceptance requires a verified token email matching the invitation.
+
+Job mutations acquire transaction-scoped advisory locks for idempotency keys and workspace audit sequencing. Reusing a key with the same request returns the original result; reusing it for a different request is rejected. A stale `baseVersion` returns `VERSION_CONFLICT`. Deletes retain a tombstone and audit evidence. If audit insertion fails, the entity mutation, change-feed record, and idempotency record roll back together.
 
 ## Migration policy
 
