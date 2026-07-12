@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import {
   bigint,
   bigserial,
@@ -33,6 +34,9 @@ export const membershipStatus = pgEnum('membership_status', ['invited', 'active'
 export const invitationStatus = pgEnum('invitation_status', ['pending', 'accepted', 'revoked', 'expired']);
 export const changeOperation = pgEnum('change_operation', ['upsert', 'delete']);
 export const transcriptionStatus = pgEnum('transcription_status', ['queued', 'processing', 'completed', 'failed']);
+export const clockSessionStatus = pgEnum('clock_session_status', ['active', 'completed', 'cancelled']);
+export const timeEntryStatus = pgEnum('time_entry_status', ['draft', 'submitted', 'approved', 'rejected', 'correction_requested']);
+export const timeApprovalDecision = pgEnum('time_approval_decision', ['pending', 'approved', 'rejected', 'correction_requested', 'superseded']);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey(),
@@ -144,6 +148,58 @@ export const transcriptionJobs = pgTable('transcription_jobs', {
   createdBy: uuid('created_by').notNull().references(() => users.id),
   ...timestamps(),
 }, (table) => [index('transcription_jobs_workspace_status_idx').on(table.workspaceId, table.status)]);
+
+export const clockSessions = pgTable('clock_sessions', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  workerUserId: uuid('worker_user_id').notNull().references(() => users.id),
+  jobId: uuid('job_id').notNull().references(() => jobs.id, { onDelete: 'restrict' }),
+  status: clockSessionStatus('status').notNull().default('active'),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+  ...syncMetadata(),
+}, (table) => [
+  index('clock_sessions_workspace_worker_idx').on(table.workspaceId, table.workerUserId, table.status),
+  uniqueIndex('clock_sessions_one_active_worker').on(table.workspaceId, table.workerUserId).where(sql`${table.status} = 'active'`),
+]);
+
+export const timeEntries = pgTable('time_entries', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  workerUserId: uuid('worker_user_id').notNull().references(() => users.id),
+  jobId: uuid('job_id').notNull().references(() => jobs.id, { onDelete: 'restrict' }),
+  clockSessionId: uuid('clock_session_id').references(() => clockSessions.id, { onDelete: 'set null' }),
+  status: timeEntryStatus('status').notNull().default('draft'),
+  currentRevisionNumber: integer('current_revision_number').notNull().default(1),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+  ...syncMetadata(),
+}, (table) => [index('time_entries_workspace_status_idx').on(table.workspaceId, table.status, table.updatedAt)]);
+
+export const timeEntryRevisions = pgTable('time_entry_revisions', {
+  timeEntryId: uuid('time_entry_id').notNull().references(() => timeEntries.id, { onDelete: 'restrict' }),
+  revisionNumber: integer('revision_number').notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+  endedAt: timestamp('ended_at', { withTimezone: true }).notNull(),
+  totalMinutes: integer('total_minutes').notNull(),
+  entryType: text('entry_type').notNull(),
+  notes: text('notes').notNull().default(''),
+  correctionReason: text('correction_reason'),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.timeEntryId, table.revisionNumber] })]);
+
+export const timeApprovals = pgTable('time_approvals', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  timeEntryId: uuid('time_entry_id').notNull().references(() => timeEntries.id, { onDelete: 'restrict' }),
+  revisionNumber: integer('revision_number').notNull(),
+  decision: timeApprovalDecision('decision').notNull().default('pending'),
+  decidedBy: uuid('decided_by').references(() => users.id),
+  reason: text('reason'),
+  decidedAt: timestamp('decided_at', { withTimezone: true }),
+  ...timestamps(),
+}, (table) => [index('time_approvals_workspace_decision_idx').on(table.workspaceId, table.decision, table.createdAt)]);
 
 export const workspaceChanges = pgTable('workspace_changes', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),

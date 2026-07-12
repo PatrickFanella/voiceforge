@@ -1,5 +1,5 @@
 import { createAuth0TokenVerifier } from '@voiceforge/auth';
-import { createDatabase, JobRepository, SyncRepository, TenancyRepository, TranscriptionRepository } from '@voiceforge/database';
+import { createDatabase, JobRepository, SyncRepository, TenancyRepository, TimeRepository, TranscriptionRepository } from '@voiceforge/database';
 import { S3Client } from '@aws-sdk/client-s3';
 import { Queue, type ConnectionOptions } from 'bullmq';
 import { buildApp } from './app.js';
@@ -39,6 +39,7 @@ const app = await buildApp({
       }); },
     },
   },
+  time: new TimeRepository(database.db),
 });
 const port = Number.parseInt(process.env.PORT ?? '3000', 10);
 

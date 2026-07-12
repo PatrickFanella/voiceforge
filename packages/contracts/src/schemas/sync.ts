@@ -3,7 +3,7 @@ import { Uuid } from './common.js';
 
 export const SyncMutation = Type.Object({
   mutationId: Uuid,
-  entityType: Type.Literal('job'),
+  entityType: Type.Union([Type.Literal('job'), Type.Literal('time_entry')]),
   entityId: Uuid,
   operation: Type.Union([Type.Literal('create'), Type.Literal('update'), Type.Literal('delete')]),
   baseVersion: Type.Integer({ minimum: 0 }),

@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { v7 as uuidv7 } from 'uuid';
 
 import { Colors } from '@/constants/colors';
 import { buildTimeEntryFromClock } from '@/domain/clock';
@@ -36,7 +37,7 @@ export default function TimeReviewScreen() {
   const confirm = async () => {
     if (!job || !voiceLogId) return Alert.alert('Review required', 'A job and source voice log are required.');
     try {
-      const entry = buildTimeEntryFromClock({ id: `time-${Date.now()}`, job, startedAt: new Date(startedAt).toISOString(), endedAt: new Date(endedAt).toISOString(), type, notes, sourceVoiceLogId: voiceLogId });
+      const entry = buildTimeEntryFromClock({ id: uuidv7(), job, startedAt: new Date(startedAt).toISOString(), endedAt: new Date(endedAt).toISOString(), type, notes, sourceVoiceLogId: voiceLogId });
       setSaving(true);
       await app.addTimeEntry(entry, true);
       router.replace('/(tabs)/reports');

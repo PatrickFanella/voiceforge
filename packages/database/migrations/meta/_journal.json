@@ -15,6 +15,13 @@
       "when": 1783872934717,
       "tag": "0001_marvelous_redwing",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783873892802,
+      "tag": "0002_hard_hercules",
+      "breakpoints": true
     }
   ]
 }

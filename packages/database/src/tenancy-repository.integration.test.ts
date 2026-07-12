@@ -5,6 +5,7 @@ import { IdempotencyConflictError, JobRepository, VersionConflictError } from '.
 import { TenancyRepository } from './tenancy-repository.js';
 import { SyncRepository } from './sync-repository.js';
 import { TranscriptionRepository } from './transcription-repository.js';
+import { TimeRepository } from './time-repository.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const suite = databaseUrl ? describe : describe.skip;
@@ -15,6 +16,7 @@ suite('TenancyRepository against PostgreSQL', () => {
   const jobRepository = new JobRepository(database.db);
   const syncRepository = new SyncRepository(database.db);
   const transcriptionRepository = new TranscriptionRepository(database.db);
+  const timeRepository = new TimeRepository(database.db);
 
   beforeAll(async () => {
     await database.db.execute(sql`truncate table invitations, workspace_memberships, identities, users, workspaces cascade`);
@@ -153,5 +155,63 @@ suite('TenancyRepository against PostgreSQL', () => {
         (select count(*)::int from audit_events where workspace_id = ${actor.personalWorkspaceId} and entity_type in ('time_entry', 'safety_report')) as consequential
     `);
     expect(evidence[0]).toEqual({ transcript: 'Two reviewed hours on site.', voice_changes: 2, consequential: 0 });
+  });
+
+  it('preserves immutable time revisions through correction, approval, and owner adjustment', async () => {
+    const actor = await repository.bootstrapIdentity({ subject: 'auth0|time-owner', email: 'time@example.com' });
+    const team = await repository.createTeam(actor.user.id, { name: 'Time crew', timeZone: 'America/Chicago' });
+    const job = await jobRepository.create({
+      workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'time-job-create-001',
+      id: crypto.randomUUID(), name: 'Time job',
+    });
+    const clockId = crypto.randomUUID();
+    await timeRepository.startClock({
+      workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'clock-start-000001',
+      id: clockId, jobId: job.id, startedAt: new Date('2026-07-12T23:30:00Z'),
+    });
+    await expect(timeRepository.startClock({
+      workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'clock-start-second1',
+      id: crypto.randomUUID(), jobId: job.id, startedAt: new Date('2026-07-12T23:45:00Z'),
+    })).rejects.toThrow('already active');
+    const timeEntryId = crypto.randomUUID();
+    const draft = await timeRepository.stopClock({
+      workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'clock-stop-0000001',
+      clockSessionId: clockId, timeEntryId, endedAt: new Date('2026-07-13T01:00:00Z'), entryType: 'regular', notes: 'Initial',
+    });
+    expect(draft).toMatchObject({ status: 'draft', totalMinutes: 90, revisionNumber: 1 });
+    await timeRepository.submit({ workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'time-submit-000001', id: timeEntryId, requiresApproval: true });
+    await timeRepository.decide({
+      workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'time-correction-001', id: timeEntryId,
+      decision: 'correction_requested', reason: 'Correct the end time',
+    });
+    const corrected = await timeRepository.correct({
+      workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'time-correct-000001', id: timeEntryId,
+      startedAt: new Date('2026-07-12T23:30:00Z'), endedAt: new Date('2026-07-13T00:30:00Z'), entryType: 'regular',
+      notes: 'Corrected', reason: 'End time was wrong', ownerAdjustment: false,
+    });
+    expect(corrected).toMatchObject({ status: 'draft', totalMinutes: 60, revisionNumber: 2 });
+    await timeRepository.submit({ workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'time-resubmit-00001', id: timeEntryId, requiresApproval: true });
+    const approved = await timeRepository.decide({ workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'time-approve-000001', id: timeEntryId, decision: 'approved' });
+    expect(approved.status).toBe('approved');
+    const adjusted = await timeRepository.correct({
+      workspaceId: team.id, actorUserId: actor.user.id, idempotencyKey: 'time-adjust-0000001', id: timeEntryId,
+      startedAt: new Date('2026-07-12T23:30:00Z'), endedAt: new Date('2026-07-13T00:45:00Z'), entryType: 'regular',
+      notes: 'Owner adjustment', reason: 'Verified against site log', ownerAdjustment: true,
+    });
+    expect(adjusted).toMatchObject({ status: 'approved', totalMinutes: 75, revisionNumber: 3 });
+    const history = await timeRepository.history(team.id, timeEntryId);
+    expect(history.revisions.map((revision) => revision.totalMinutes)).toEqual([90, 60, 75]);
+    expect(history.approvals.map((approval) => approval.decision)).toEqual(['correction_requested', 'approved', 'approved']);
+
+    const personalJob = await jobRepository.create({
+      workspaceId: actor.personalWorkspaceId, actorUserId: actor.user.id, idempotencyKey: 'personal-time-job-01', id: crypto.randomUUID(), name: 'Personal job',
+    });
+    const personal = await timeRepository.createDraft({
+      workspaceId: actor.personalWorkspaceId, actorUserId: actor.user.id, idempotencyKey: 'personal-time-draft1', id: crypto.randomUUID(),
+      jobId: personalJob.id, startedAt: new Date('2026-07-12T10:00:00Z'), endedAt: new Date('2026-07-12T11:00:00Z'), entryType: 'regular', notes: '',
+    });
+    const finalized = await timeRepository.submit({ workspaceId: actor.personalWorkspaceId, actorUserId: actor.user.id, idempotencyKey: 'personal-time-submit', id: personal.id, requiresApproval: false });
+    expect(finalized.status).toBe('approved');
+    expect((await timeRepository.history(actor.personalWorkspaceId, personal.id)).approvals).toEqual([]);
   });
 });

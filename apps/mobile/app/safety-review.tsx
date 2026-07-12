@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { v7 as uuidv7 } from 'uuid';
 
 import { Colors } from '@/constants/colors';
 import { getLocalDateKey } from '@/domain/time';
@@ -26,7 +27,7 @@ export default function SafetyReviewScreen() {
       return;
     }
     const report: SafetyReport = {
-      id: `safety-${Date.now()}`, jobId: job.id, jobTitle: job.title, date: getLocalDateKey(),
+      id: uuidv7(), jobId: job.id, jobTitle: job.title, date: getLocalDateKey(),
       type, severity, description: description.trim(), resolved, voiceLogged: true, sourceVoiceLogId: voiceLogId,
     };
     setSaving(true);

@@ -11,6 +11,12 @@ const access: WorkspaceAccess = { id: workspaceId, kind: 'team', name: 'Crew', t
 const verifier: TokenVerifier = { verify: async () => ({ subject: 'auth0|owner', email: 'owner@example.com', emailVerified: true }) };
 
 function dependencies() {
+  const timeRecord = {
+    id: entityId, workspaceId, workerUserId: userId, jobId: '01980f58-9b8d-7000-8000-000000000046', clockSessionId: null,
+    status: 'draft' as const, version: 1, revisionNumber: 1, startedAt: new Date('2026-01-01T08:00:00Z'),
+    endedAt: new Date('2026-01-01T09:00:00Z'), totalMinutes: 60, entryType: 'regular', notes: '', correctionReason: null,
+    submittedAt: null, approvedAt: null, createdAt: new Date(), updatedAt: new Date(),
+  };
   return {
     verifier,
     tenancy: {
@@ -26,6 +32,10 @@ function dependencies() {
       hasMore: false,
     })) },
     cursorSecret: 'test-cursor-secret-at-least-32-bytes',
+    time: {
+      startClock: vi.fn(), stopClock: vi.fn(), createDraft: vi.fn(async () => timeRecord), editDraft: vi.fn(async () => ({ ...timeRecord, version: 2 })),
+      submit: vi.fn(), decide: vi.fn(), correct: vi.fn(), listApprovalQueue: vi.fn(async () => []), history: vi.fn(),
+    },
   };
 }
 
@@ -54,6 +64,27 @@ describe('sync routes', () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ results: [{ mutationId, entityId, status: 'conflict', errorCode: 'VERSION_CONFLICT' }] });
+    await app.close();
+  });
+
+  it('accepts offline time drafts but leaves submission and approval server-authoritative', async () => {
+    const deps = dependencies();
+    const app = await buildApp(deps);
+    const timeMutationId = '01980f58-9b8d-7000-8000-000000000047';
+    const response = await app.inject({
+      method: 'POST', url: '/v1/sync/push',
+      headers: { authorization: 'Bearer valid', 'idempotency-key': timeMutationId },
+      payload: {
+        workspaceId, deviceId: '01980f58-9b8d-7000-8000-000000000045',
+        mutations: [{
+          mutationId: timeMutationId, entityType: 'time_entry', entityId, operation: 'create', baseVersion: 0,
+          payload: { jobId: '01980f58-9b8d-7000-8000-000000000046', startedAt: '2026-01-01T08:00:00Z', endedAt: '2026-01-01T09:00:00Z', entryType: 'regular', notes: '' },
+        }],
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(deps.time.createDraft).toHaveBeenCalledWith(expect.objectContaining({ id: entityId, actorUserId: userId }));
+    expect(deps.time.submit).not.toHaveBeenCalled();
     await app.close();
   });
 });

@@ -23,6 +23,7 @@
     "@voiceforge/auth": "workspace:*",
     "@voiceforge/database": "workspace:*",
     "@voiceforge/sync": "workspace:*",
+    "@voiceforge/workflows": "workspace:*",
     "fastify": "^5.6.2",
     "bullmq": "^5.66.4"
   },

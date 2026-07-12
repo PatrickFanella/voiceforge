@@ -60,6 +60,7 @@ bun run db:migrate     # apply committed PostgreSQL migrations
 - `apps/mobile/tests/` covers pure rules, repository transactions, migrations, and shared component state.
 - `apps/api/` serves the REST/OpenAPI surface and `apps/worker/` runs durable background processing; `apps/admin/` is reserved for the supervisor console.
 - `packages/transcription/` contains provider-independent transcription processing and the Deepgram adapter.
+- `packages/workflows/` contains provider- and transport-independent time and safety state-machine rules.
 - `packages/` contains code shared across applications.
 - `infra/compose.yaml` runs local PostgreSQL, Redis, MinIO, and Mailpit dependencies.
 

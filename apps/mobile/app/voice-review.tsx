@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { v7 as uuidv7 } from 'uuid';
 
 import { Colors } from '@/constants/colors';
 import { extractVoiceIntent } from '@/features/voice/extract-intent';
@@ -56,7 +57,7 @@ export default function VoiceReviewScreen() {
     }
     setSaving(true);
     try {
-      const voiceLogId = `voice-${Date.now()}`;
+      const voiceLogId = uuidv7();
       await app.addVoiceLog({
         id: voiceLogId,
         timestamp: new Date().toISOString(),

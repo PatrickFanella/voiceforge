@@ -1247,9 +1247,19 @@
                           "type": "string"
                         },
                         "entityType": {
-                          "type": "string",
-                          "enum": [
-                            "job"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "job"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "time_entry"
+                              ]
+                            }
                           ]
                         },
                         "entityId": {
@@ -1883,6 +1893,1770 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/v1/clock-sessions": {
+      "post": {
+        "operationId": "startClockSession",
+        "tags": [
+          "time"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "id",
+                  "jobId",
+                  "startedAt"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "id": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "jobId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "startedAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "minLength": 16,
+              "maxLength": 255,
+              "type": "string"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "workspaceId",
+                    "workerUserId",
+                    "jobId",
+                    "status",
+                    "startedAt",
+                    "endedAt",
+                    "version",
+                    "createdBy",
+                    "updatedBy",
+                    "deletedAt",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workspaceId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workerUserId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "jobId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "active"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "completed"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "cancelled"
+                          ]
+                        }
+                      ]
+                    },
+                    "startedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "endedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "createdBy": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "updatedBy": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "deletedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/clock-sessions/{clockSessionId}/stop": {
+      "post": {
+        "operationId": "stopClockSession",
+        "tags": [
+          "time"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "timeEntryId",
+                  "endedAt",
+                  "entryType",
+                  "notes"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "timeEntryId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "endedAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "entryType": {
+                    "minLength": 1,
+                    "maxLength": 50,
+                    "type": "string"
+                  },
+                  "notes": {
+                    "maxLength": 5000,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "clockSessionId",
+            "required": true
+          },
+          {
+            "schema": {
+              "minLength": 16,
+              "maxLength": 255,
+              "type": "string"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "workspaceId",
+                    "workerUserId",
+                    "jobId",
+                    "clockSessionId",
+                    "status",
+                    "version",
+                    "revisionNumber",
+                    "startedAt",
+                    "endedAt",
+                    "totalMinutes",
+                    "entryType",
+                    "notes",
+                    "correctionReason",
+                    "submittedAt",
+                    "approvedAt",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workspaceId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workerUserId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "jobId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "clockSessionId": {
+                      "anyOf": [
+                        {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "draft"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "submitted"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "approved"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "rejected"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "correction_requested"
+                          ]
+                        }
+                      ]
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "revisionNumber": {
+                      "type": "integer"
+                    },
+                    "startedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "endedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "totalMinutes": {
+                      "type": "integer"
+                    },
+                    "entryType": {
+                      "type": "string"
+                    },
+                    "notes": {
+                      "type": "string"
+                    },
+                    "correctionReason": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "submittedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "approvedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/time-entries": {
+      "post": {
+        "operationId": "createTimeEntry",
+        "tags": [
+          "time"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "id",
+                  "jobId",
+                  "startedAt",
+                  "endedAt",
+                  "entryType",
+                  "notes"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "id": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "jobId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "startedAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "endedAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "entryType": {
+                    "minLength": 1,
+                    "maxLength": 50,
+                    "type": "string"
+                  },
+                  "notes": {
+                    "maxLength": 5000,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "minLength": 16,
+              "maxLength": 255,
+              "type": "string"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "workspaceId",
+                    "workerUserId",
+                    "jobId",
+                    "clockSessionId",
+                    "status",
+                    "version",
+                    "revisionNumber",
+                    "startedAt",
+                    "endedAt",
+                    "totalMinutes",
+                    "entryType",
+                    "notes",
+                    "correctionReason",
+                    "submittedAt",
+                    "approvedAt",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workspaceId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workerUserId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "jobId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "clockSessionId": {
+                      "anyOf": [
+                        {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "draft"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "submitted"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "approved"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "rejected"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "correction_requested"
+                          ]
+                        }
+                      ]
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "revisionNumber": {
+                      "type": "integer"
+                    },
+                    "startedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "endedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "totalMinutes": {
+                      "type": "integer"
+                    },
+                    "entryType": {
+                      "type": "string"
+                    },
+                    "notes": {
+                      "type": "string"
+                    },
+                    "correctionReason": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "submittedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "approvedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/time-entries/{timeEntryId}/submit": {
+      "post": {
+        "operationId": "submitTimeEntry",
+        "tags": [
+          "time"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "format": "uuid",
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "timeEntryId",
+            "required": true
+          },
+          {
+            "schema": {
+              "minLength": 16,
+              "maxLength": 255,
+              "type": "string"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "workspaceId",
+                    "workerUserId",
+                    "jobId",
+                    "clockSessionId",
+                    "status",
+                    "version",
+                    "revisionNumber",
+                    "startedAt",
+                    "endedAt",
+                    "totalMinutes",
+                    "entryType",
+                    "notes",
+                    "correctionReason",
+                    "submittedAt",
+                    "approvedAt",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workspaceId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workerUserId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "jobId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "clockSessionId": {
+                      "anyOf": [
+                        {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "draft"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "submitted"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "approved"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "rejected"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "correction_requested"
+                          ]
+                        }
+                      ]
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "revisionNumber": {
+                      "type": "integer"
+                    },
+                    "startedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "endedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "totalMinutes": {
+                      "type": "integer"
+                    },
+                    "entryType": {
+                      "type": "string"
+                    },
+                    "notes": {
+                      "type": "string"
+                    },
+                    "correctionReason": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "submittedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "approvedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/time-approvals/{timeEntryId}": {
+      "post": {
+        "operationId": "decideTimeEntry",
+        "tags": [
+          "time"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "decision"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "decision": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "approved"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "rejected"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "correction_requested"
+                        ]
+                      }
+                    ]
+                  },
+                  "reason": {
+                    "maxLength": 2000,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "timeEntryId",
+            "required": true
+          },
+          {
+            "schema": {
+              "minLength": 16,
+              "maxLength": 255,
+              "type": "string"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "workspaceId",
+                    "workerUserId",
+                    "jobId",
+                    "clockSessionId",
+                    "status",
+                    "version",
+                    "revisionNumber",
+                    "startedAt",
+                    "endedAt",
+                    "totalMinutes",
+                    "entryType",
+                    "notes",
+                    "correctionReason",
+                    "submittedAt",
+                    "approvedAt",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workspaceId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workerUserId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "jobId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "clockSessionId": {
+                      "anyOf": [
+                        {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "draft"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "submitted"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "approved"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "rejected"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "correction_requested"
+                          ]
+                        }
+                      ]
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "revisionNumber": {
+                      "type": "integer"
+                    },
+                    "startedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "endedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "totalMinutes": {
+                      "type": "integer"
+                    },
+                    "entryType": {
+                      "type": "string"
+                    },
+                    "notes": {
+                      "type": "string"
+                    },
+                    "correctionReason": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "submittedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "approvedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/time-entries/{timeEntryId}/corrections": {
+      "post": {
+        "operationId": "correctTimeEntry",
+        "tags": [
+          "time"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "startedAt",
+                  "endedAt",
+                  "entryType",
+                  "notes",
+                  "reason"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "startedAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "endedAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "entryType": {
+                    "minLength": 1,
+                    "maxLength": 50,
+                    "type": "string"
+                  },
+                  "notes": {
+                    "maxLength": 5000,
+                    "type": "string"
+                  },
+                  "reason": {
+                    "minLength": 1,
+                    "maxLength": 2000,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "timeEntryId",
+            "required": true
+          },
+          {
+            "schema": {
+              "minLength": 16,
+              "maxLength": 255,
+              "type": "string"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "workspaceId",
+                    "workerUserId",
+                    "jobId",
+                    "clockSessionId",
+                    "status",
+                    "version",
+                    "revisionNumber",
+                    "startedAt",
+                    "endedAt",
+                    "totalMinutes",
+                    "entryType",
+                    "notes",
+                    "correctionReason",
+                    "submittedAt",
+                    "approvedAt",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workspaceId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workerUserId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "jobId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "clockSessionId": {
+                      "anyOf": [
+                        {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "draft"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "submitted"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "approved"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "rejected"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "correction_requested"
+                          ]
+                        }
+                      ]
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "revisionNumber": {
+                      "type": "integer"
+                    },
+                    "startedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "endedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "totalMinutes": {
+                      "type": "integer"
+                    },
+                    "entryType": {
+                      "type": "string"
+                    },
+                    "notes": {
+                      "type": "string"
+                    },
+                    "correctionReason": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "submittedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "approvedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/time-entries/{timeEntryId}/adjustments": {
+      "post": {
+        "operationId": "adjustApprovedTimeEntry",
+        "tags": [
+          "time",
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "startedAt",
+                  "endedAt",
+                  "entryType",
+                  "notes",
+                  "reason"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "startedAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "endedAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "entryType": {
+                    "minLength": 1,
+                    "maxLength": 50,
+                    "type": "string"
+                  },
+                  "notes": {
+                    "maxLength": 5000,
+                    "type": "string"
+                  },
+                  "reason": {
+                    "minLength": 1,
+                    "maxLength": 2000,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "timeEntryId",
+            "required": true
+          },
+          {
+            "schema": {
+              "minLength": 16,
+              "maxLength": 255,
+              "type": "string"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "workspaceId",
+                    "workerUserId",
+                    "jobId",
+                    "clockSessionId",
+                    "status",
+                    "version",
+                    "revisionNumber",
+                    "startedAt",
+                    "endedAt",
+                    "totalMinutes",
+                    "entryType",
+                    "notes",
+                    "correctionReason",
+                    "submittedAt",
+                    "approvedAt",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workspaceId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workerUserId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "jobId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "clockSessionId": {
+                      "anyOf": [
+                        {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "draft"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "submitted"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "approved"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "rejected"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "correction_requested"
+                          ]
+                        }
+                      ]
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "revisionNumber": {
+                      "type": "integer"
+                    },
+                    "startedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "endedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "totalMinutes": {
+                      "type": "integer"
+                    },
+                    "entryType": {
+                      "type": "string"
+                    },
+                    "notes": {
+                      "type": "string"
+                    },
+                    "correctionReason": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "submittedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "approvedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/time-approvals": {
+      "get": {
+        "operationId": "listTimeApprovalQueue",
+        "tags": [
+          "time"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "query",
+            "name": "workspaceId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "nextCursor"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "workspaceId",
+                          "workerUserId",
+                          "jobId",
+                          "clockSessionId",
+                          "status",
+                          "version",
+                          "revisionNumber",
+                          "startedAt",
+                          "endedAt",
+                          "totalMinutes",
+                          "entryType",
+                          "notes",
+                          "correctionReason",
+                          "submittedAt",
+                          "approvedAt",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "properties": {
+                          "id": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "workspaceId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "workerUserId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "jobId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "clockSessionId": {
+                            "anyOf": [
+                              {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "draft"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "submitted"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "approved"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "rejected"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "correction_requested"
+                                ]
+                              }
+                            ]
+                          },
+                          "version": {
+                            "type": "integer"
+                          },
+                          "revisionNumber": {
+                            "type": "integer"
+                          },
+                          "startedAt": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "endedAt": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "totalMinutes": {
+                            "type": "integer"
+                          },
+                          "entryType": {
+                            "type": "string"
+                          },
+                          "notes": {
+                            "type": "string"
+                          },
+                          "correctionReason": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "submittedAt": {
+                            "anyOf": [
+                              {
+                                "format": "date-time",
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "approvedAt": {
+                            "anyOf": [
+                              {
+                                "format": "date-time",
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "createdAt": {
+                            "format": "date-time",
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "format": "date-time",
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/time-entries/{timeEntryId}/history": {
+      "get": {
+        "operationId": "getTimeEntryHistory",
+        "tags": [
+          "time"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "query",
+            "name": "workspaceId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ]
+            },
+            "in": "query",
+            "name": "format",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "timeEntryId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
           }
         }
       }

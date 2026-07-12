@@ -1,6 +1,6 @@
 import { AuthorizationError, requirePermission, type TokenVerifier } from '@voiceforge/auth';
 import { IdempotencyKeyHeader, SyncPullResponse, SyncPushBody, SyncPushResponse, type SyncPushBody as SyncPushInput } from '@voiceforge/contracts';
-import { VersionConflictError, type JobRepository, type SyncRepository } from '@voiceforge/database';
+import { VersionConflictError, type JobRepository, type SyncRepository, type TimeRepository } from '@voiceforge/database';
 import { decodeCursor, encodeCursor } from '@voiceforge/sync';
 import type { FastifyInstance } from 'fastify';
 import { identityFor, type TenancyStore } from './tenancy.js';
@@ -10,6 +10,7 @@ export async function registerSyncRoutes(app: FastifyInstance, dependencies: {
   tenancy: TenancyStore;
   jobs: Pick<JobRepository, 'create' | 'update' | 'delete'>;
   sync: Pick<SyncRepository, 'pull'>;
+  time?: Pick<TimeRepository, 'createDraft' | 'editDraft'>;
   cursorSecret: string;
 }) {
   app.get<{ Querystring: { workspaceId: string; cursor?: string }; Reply: { cursor: string; hasMore: boolean; changes: Awaited<ReturnType<SyncRepository['pull']>>['changes'] } }>('/v1/sync/pull', {
@@ -42,7 +43,28 @@ export async function registerSyncRoutes(app: FastifyInstance, dependencies: {
     for (const mutation of request.body.mutations) {
       try {
         let result: { version: number };
-        if (mutation.operation === 'create') {
+        if (mutation.entityType === 'time_entry') {
+          if (!dependencies.time || mutation.operation === 'delete') throw new Error('Unsupported time mutation.');
+          const payload = mutation.payload;
+          const jobId = payload.jobId;
+          const startedAt = payload.startedAt;
+          const endedAt = payload.endedAt;
+          const entryType = payload.entryType;
+          if (typeof jobId !== 'string' || typeof startedAt !== 'string' || typeof endedAt !== 'string' || typeof entryType !== 'string') {
+            throw new Error('Time mutation payload is invalid.');
+          }
+          result = mutation.operation === 'create'
+            ? await dependencies.time.createDraft({
+              workspaceId: access.id, actorUserId: session.user.id, idempotencyKey: mutation.mutationId,
+              id: mutation.entityId, jobId, startedAt: new Date(startedAt), endedAt: new Date(endedAt), entryType,
+              notes: typeof payload.notes === 'string' ? payload.notes : '',
+            })
+            : await dependencies.time.editDraft({
+              workspaceId: access.id, actorUserId: session.user.id, idempotencyKey: mutation.mutationId,
+              id: mutation.entityId, baseVersion: mutation.baseVersion, startedAt: new Date(startedAt), endedAt: new Date(endedAt), entryType,
+              notes: typeof payload.notes === 'string' ? payload.notes : '',
+            });
+        } else if (mutation.operation === 'create') {
           const name = mutation.payload.name;
           if (typeof name !== 'string' || !name.trim()) throw new Error('Job name is required.');
           result = await dependencies.jobs.create({

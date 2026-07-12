@@ -1,5 +1,6 @@
 import { migrateDatabase } from '@/db/migrations';
 import { applySyncTransaction, getPendingMutations, queueMutation } from '@/db/sync';
+import { VoiceForgeRepository } from '@/db/repository';
 import { BunDatabaseConnection } from './support/bun-database';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -72,5 +73,26 @@ describe('mobile synchronization replica', () => {
       .toEqual({ transcript: 'Two hours on site.', confidence: 0.9, provider: 'deepgram' });
     expect(await database.getFirstAsync<{ count: number }>('SELECT count(*) AS count FROM time_entries')).toEqual({ count: 0 });
     expect(await database.getFirstAsync<{ count: number }>('SELECT count(*) AS count FROM safety_reports')).toEqual({ count: 0 });
+  });
+
+  it('queues and coalesces offline time drafts only after explicit workspace assignment', async () => {
+    const repository = new VoiceForgeRepository(database);
+    const timeId = '01980f58-9b8d-7000-8000-000000000027';
+    await database.runAsync(
+      `INSERT INTO jobs
+       (id, title, client, address, status, trade, priority, start_date, due_date, hours_logged, hours_estimated, notes_json, crew_json, created_at, updated_at, workspace_id)
+       VALUES (?, 'Server job', '', '', 'active', '', 'medium', '2026-07-12', '2026-07-12', 0, 0, '[]', '[]', ?, ?, ?)`,
+      entityId, '2026-07-12T00:00:00Z', '2026-07-12T00:00:00Z', workspaceId,
+    );
+    await repository.setSetting('active_workspace_id', workspaceId);
+    const entry = {
+      id: timeId, jobId: entityId, jobTitle: 'Server job', date: '2026-07-12', startTime: '23:30', endTime: '00:30',
+      hours: 1, type: 'regular' as const, notes: 'Initial', voiceLogged: false,
+    };
+    await repository.addTimeEntry(entry);
+    await repository.updateTimeEntry({ ...entry, notes: 'Edited offline' });
+    const pending = await getPendingMutations(database, workspaceId);
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ entityType: 'time_entry', operation: 'create', baseVersion: 0, payload: { notes: 'Edited offline' } });
   });
 });

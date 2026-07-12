@@ -1,6 +1,8 @@
 import type { AuditEvent, Job, SafetyReport, TimeEntry, VoiceLog } from '@/types';
 
 import type { DatabaseConnection } from './types';
+import { queueMutation } from './sync';
+import { v7 as uuidv7 } from 'uuid';
 
 type JobRow = Omit<Job, 'notes' | 'crew' | 'hoursLogged' | 'hoursEstimated' | 'startDate' | 'dueDate'> & {
   start_date: string;
@@ -36,6 +38,16 @@ type VoiceLogRow = Omit<VoiceLog, 'processed' | 'jobId' | 'audioUri' | 'confiden
 
 const nowIso = () => new Date().toISOString();
 const auditId = () => `audit-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+function localTimePayload(entry: TimeEntry) {
+  const startedAt = new Date(`${entry.date}T${entry.startTime}:00`);
+  const endedAt = new Date(`${entry.date}T${entry.endTime}:00`);
+  if (endedAt <= startedAt) endedAt.setDate(endedAt.getDate() + 1);
+  return {
+    jobId: entry.jobId, startedAt: startedAt.toISOString(), endedAt: endedAt.toISOString(),
+    entryType: entry.type, notes: entry.notes,
+  };
+}
 
 export class VoiceForgeRepository {
   constructor(private readonly db: DatabaseConnection) {}
@@ -192,6 +204,7 @@ export class VoiceForgeRepository {
       await this.writeAudit('time_entry', entry.id, entry.sourceVoiceLogId ? 'confirmed' : 'created', entry.sourceVoiceLogId, {
         hours: entry.hours, type: entry.type,
       });
+      await this.queueTimeEntry(entry, 'create', 0);
     });
   }
 
@@ -206,6 +219,7 @@ export class VoiceForgeRepository {
         entry.hours, entry.type, entry.notes, 0, null, now, now,
       );
       await this.writeAudit('time_entry', entry.id, 'confirmed', undefined, { source: 'clock', hours: entry.hours, type: entry.type });
+      await this.queueTimeEntry(entry, 'create', 0);
       await this.setSetting('clock_state', { clockedIn: false, clockInTime: null, jobId: null });
     });
   }
@@ -230,12 +244,36 @@ export class VoiceForgeRepository {
 
   async updateTimeEntry(entry: TimeEntry): Promise<void> {
     await this.db.withTransactionAsync(async () => {
+      const sync = await this.db.getFirstAsync<{ serverVersion: number }>('SELECT server_version AS serverVersion FROM time_entries WHERE id = ?', entry.id);
       const result = await this.db.runAsync(
         `UPDATE time_entries SET date = ?, start_time = ?, end_time = ?, hours = ?, type = ?, notes = ?, updated_at = ? WHERE id = ?`,
         entry.date, entry.startTime, entry.endTime, entry.hours, entry.type, entry.notes, nowIso(), entry.id,
       );
       if (!result.changes) throw new Error('Time entry not found');
       await this.writeAudit('time_entry', entry.id, 'updated', entry.sourceVoiceLogId);
+      await this.queueTimeEntry(entry, 'update', sync?.serverVersion ?? 0);
+    });
+  }
+
+  private async queueTimeEntry(entry: TimeEntry, operation: 'create' | 'update', baseVersion: number): Promise<void> {
+    const workspaceId = await this.getSetting<string | null>('active_workspace_id', null);
+    if (!workspaceId || !isUuid(workspaceId) || !isUuid(entry.id) || !isUuid(entry.jobId)) return;
+    const existing = await this.db.getFirstAsync<{ mutationId: string; operation: string }>(
+      'SELECT mutation_id AS mutationId, operation FROM sync_outbox WHERE workspace_id = ? AND entity_id = ? ORDER BY created_at LIMIT 1', workspaceId, entry.id,
+    );
+    const payload = localTimePayload(entry);
+    if (existing?.operation === 'create') {
+      await this.db.runAsync('UPDATE sync_outbox SET payload_json = ?, updated_at = ? WHERE mutation_id = ?', JSON.stringify(payload), nowIso(), existing.mutationId);
+      return;
+    }
+    let deviceId = await this.getSetting<string | null>('device_id', null);
+    if (!deviceId || !isUuid(deviceId)) {
+      deviceId = uuidv7();
+      await this.setSetting('device_id', deviceId);
+    }
+    await queueMutation(this.db, {
+      mutationId: uuidv7(), workspaceId, deviceId, entityType: 'time_entry', entityId: entry.id,
+      operation, baseVersion, payload,
     });
   }
 

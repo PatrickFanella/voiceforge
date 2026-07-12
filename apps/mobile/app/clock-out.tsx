@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { v7 as uuidv7 } from 'uuid';
 
 import { Colors } from '@/constants/colors';
 import { buildTimeEntryFromClock } from '@/domain/clock';
@@ -56,7 +57,7 @@ export default function ClockOutScreen() {
       const end = applyTime(now, endTime);
       if (end <= start) end.setDate(end.getDate() + 1);
       const entry = buildTimeEntryFromClock({
-        id: `time-${Date.now()}`, job, startedAt: start.toISOString(), endedAt: end.toISOString(), type, notes,
+        id: uuidv7(), job, startedAt: start.toISOString(), endedAt: end.toISOString(), type, notes,
       });
       setSaving(true);
       await app.completeClockOut(entry);

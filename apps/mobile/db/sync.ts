@@ -4,7 +4,7 @@ export interface OutboxMutation {
   mutationId: string;
   workspaceId: string;
   deviceId: string;
-  entityType: 'job';
+  entityType: 'job' | 'time_entry';
   entityId: string;
   operation: 'create' | 'update' | 'delete';
   baseVersion: number;
@@ -57,7 +57,7 @@ export async function queueMutation(db: DatabaseConnection, mutation: OutboxMuta
 
 export async function getPendingMutations(db: DatabaseConnection, workspaceId: string, limit = 100): Promise<OutboxMutation[]> {
   const rows = await db.getAllAsync<{
-    mutationId: string; workspaceId: string; deviceId: string; entityType: 'job'; entityId: string;
+    mutationId: string; workspaceId: string; deviceId: string; entityType: OutboxMutation['entityType']; entityId: string;
     operation: OutboxMutation['operation']; baseVersion: number; payloadJson: string;
   }>(
     `SELECT mutation_id AS mutationId, workspace_id AS workspaceId, device_id AS deviceId,
@@ -111,6 +111,30 @@ export async function applySyncTransaction(
              provider = excluded.provider, updated_at = excluded.updated_at, server_version = excluded.server_version,
              sync_status = 'synced', deleted_at = NULL`,
           change.entityId, timestamp, transcript, confidence, provider, timestamp, timestamp, workspaceId, change.version,
+        );
+        continue;
+      }
+      if (change.entityType === 'time_entry' && change.operation === 'upsert') {
+        const payload = change.payload ?? {};
+        if (typeof payload.jobId !== 'string' || typeof payload.startedAt !== 'string' || typeof payload.endedAt !== 'string') continue;
+        const job = await db.getFirstAsync<{ title: string }>('SELECT title FROM jobs WHERE id = ? AND workspace_id = ?', payload.jobId, workspaceId);
+        if (!job) continue;
+        const startedAt = new Date(payload.startedAt);
+        const endedAt = new Date(payload.endedAt);
+        const hours = typeof payload.totalMinutes === 'number' ? payload.totalMinutes / 60 : (endedAt.getTime() - startedAt.getTime()) / 3_600_000;
+        await db.runAsync(
+          `INSERT INTO time_entries
+            (id, job_id, job_title, date, start_time, end_time, hours, type, notes, voice_logged, source_voice_log_id,
+             created_at, updated_at, workspace_id, server_version, sync_status, deleted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?, 'synced', NULL)
+           ON CONFLICT(id) DO UPDATE SET date = excluded.date, start_time = excluded.start_time, end_time = excluded.end_time,
+             hours = excluded.hours, type = excluded.type, notes = excluded.notes, updated_at = excluded.updated_at,
+             server_version = excluded.server_version, sync_status = 'synced', deleted_at = NULL`,
+          change.entityId, payload.jobId, job.title, startedAt.toISOString().slice(0, 10), startedAt.toISOString().slice(11, 16),
+          endedAt.toISOString().slice(11, 16), hours, typeof payload.entryType === 'string' ? payload.entryType : 'regular',
+          typeof payload.notes === 'string' ? payload.notes : '',
+          typeof payload.createdAt === 'string' ? payload.createdAt : startedAt.toISOString(),
+          typeof payload.updatedAt === 'string' ? payload.updatedAt : endedAt.toISOString(), workspaceId, change.version,
         );
         continue;
       }
