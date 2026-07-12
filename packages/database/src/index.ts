@@ -8,3 +8,4 @@ export * from './time-repository.js';
 export * from './safety-repository.js';
 export * from './billing-repository.js';
 export * from './integration-repository.js';
+export * from './governance-repository.js';

@@ -23,6 +23,8 @@ import { registerBillingRoutes, type StripeGateway } from './routes/billing.js';
 import type { BillingRepository } from '@voiceforge/database';
 import type { IntegrationRepository } from '@voiceforge/database';
 import { registerIntegrationRoutes, type ExportQueue, type ExportStorage } from './routes/integrations.js';
+import type { GovernanceRepository } from '@voiceforge/database';
+import { registerGovernanceRoutes, type SubjectQueue, type SubjectStorage } from './routes/governance.js';
 
 export interface AppDependencies {
   verifier: TokenVerifier;
@@ -42,6 +44,7 @@ export interface AppDependencies {
   };
   billing?: { repository: Pick<BillingRepository, 'get' | 'saveCustomer' | 'findCustomer' | 'setPendingSeatQuantity' | 'reconcile'>; stripe: StripeGateway };
   integrations?: { repository: Pick<IntegrationRepository, 'createExport' | 'getExport' | 'listExports' | 'createEndpoint' | 'listEndpoints' | 'listDeliveries' | 'setEndpointEnabled' | 'replayDelivery'>; exportQueue: ExportQueue; exportStorage: ExportStorage; secretKey: string };
+  governance?: { repository: Pick<GovernanceRepository, 'getPolicy' | 'configurePolicy' | 'createHold' | 'listHolds' | 'releaseHold' | 'createSubjectRequest' | 'getSubjectRequest' | 'validateAuditChain'>; queue: SubjectQueue; storage: SubjectStorage };
 }
 
 export async function buildApp(dependencies?: AppDependencies) {
@@ -98,6 +101,7 @@ export async function buildApp(dependencies?: AppDependencies) {
     if (dependencies.safety) await registerSafetyRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, ...dependencies.safety });
     if (dependencies.billing) await registerBillingRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, ...dependencies.billing });
     if (dependencies.integrations) await registerIntegrationRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, ...dependencies.integrations });
+    if (dependencies.governance) await registerGovernanceRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, ...dependencies.governance });
   }
 
   app.setNotFoundHandler((request, reply) => reply.code(404).send({

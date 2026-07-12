@@ -44,6 +44,8 @@ export const deliveryStatus = pgEnum('delivery_status', ['queued', 'sent', 'fail
 export const subscriptionStatus = pgEnum('subscription_status', ['incomplete', 'trialing', 'active', 'past_due', 'unpaid', 'paused', 'canceled']);
 export const exportStatus = pgEnum('export_status', ['queued', 'processing', 'completed', 'failed', 'expired']);
 export const webhookDeliveryStatus = pgEnum('webhook_delivery_status', ['queued', 'delivering', 'delivered', 'retrying', 'dead_letter']);
+export const subjectRequestType = pgEnum('subject_request_type', ['access', 'portability', 'erasure']);
+export const subjectRequestStatus = pgEnum('subject_request_status', ['queued', 'processing', 'completed', 'partially_completed', 'failed']);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey(),
@@ -432,3 +434,24 @@ export const webhookDeliveries = pgTable('webhook_deliveries', {
   attemptCount: integer('attempt_count').notNull().default(0), nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
   responseStatus: integer('response_status'), responseBody: text('response_body'), lastError: text('last_error'), deliveredAt: timestamp('delivered_at', { withTimezone: true }), ...timestamps(),
 }, (table) => [index('webhook_deliveries_due_idx').on(table.status, table.nextAttemptAt), index('webhook_deliveries_workspace_idx').on(table.workspaceId, table.createdAt)]);
+
+export const retentionPolicies = pgTable('retention_policies', {
+  workspaceId: uuid('workspace_id').primaryKey().references(() => workspaces.id, { onDelete: 'cascade' }),
+  timeDays: integer('time_days').notNull().default(2555), safetyDays: integer('safety_days').notNull().default(2555), auditDays: integer('audit_days').notNull().default(2555),
+  voiceLogDays: integer('voice_log_days').notNull().default(365), audioDays: integer('audio_days').notNull().default(30), configuredBy: uuid('configured_by').references(() => users.id), ...timestamps(),
+});
+
+export const legalHolds = pgTable('legal_holds', {
+  id: uuid('id').primaryKey(), workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  scope: text('scope').notNull(), entityType: text('entity_type'), entityId: uuid('entity_id'), reason: text('reason').notNull(), active: boolean('active').notNull().default(true),
+  placedBy: uuid('placed_by').notNull().references(() => users.id), releasedBy: uuid('released_by').references(() => users.id), releasedAt: timestamp('released_at', { withTimezone: true }), ...timestamps(),
+}, (table) => [index('legal_holds_workspace_active_idx').on(table.workspaceId, table.active)]);
+
+export const subjectRequests = pgTable('subject_requests', {
+  id: uuid('id').primaryKey(), userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }), requestType: subjectRequestType('request_type').notNull(), status: subjectRequestStatus('status').notNull().default('queued'),
+  requestedBy: uuid('requested_by').notNull().references(() => users.id), deadlineAt: timestamp('deadline_at', { withTimezone: true }).notNull(), result: jsonb('result'), objectKey: text('object_key'), expiresAt: timestamp('expires_at', { withTimezone: true }), errorMessage: text('error_message'), completedAt: timestamp('completed_at', { withTimezone: true }), ...timestamps(),
+}, (table) => [index('subject_requests_user_status_idx').on(table.userId, table.status)]);
+
+export const auditChainCheckpoints = pgTable('audit_chain_checkpoints', {
+  workspaceId: uuid('workspace_id').primaryKey().references(() => workspaces.id, { onDelete: 'cascade' }), lastPrunedSequence: bigint('last_pruned_sequence', { mode: 'number' }).notNull(), lastPrunedHash: text('last_pruned_hash').notNull(), prunedAt: timestamp('pruned_at', { withTimezone: true }).notNull().defaultNow(), ...timestamps(),
+});
