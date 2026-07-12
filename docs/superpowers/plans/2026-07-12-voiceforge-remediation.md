@@ -87,13 +87,13 @@
 
 ## Milestone 5: Transcription and mandatory review
 
-- [ ] Define a `TranscriptionClient` returning transcript, provider, confidence, and recoverable error information.
-- [ ] Implement a configurable HTTPS client using `EXPO_PUBLIC_TRANSCRIPTION_API_URL`, multipart audio upload, timeout, and response validation; never embed an API key.
-- [ ] Provide offline/manual review when no endpoint exists or a request fails.
-- [ ] Create a review route where transcript, category, job, and proposed action are editable before save.
-- [ ] Add deterministic keyword extraction with confidence and tests for time, safety, materials, note, ambiguous, and empty transcripts.
+- [x] Define a `TranscriptionClient` returning transcript, provider, confidence, and recoverable error information.
+- [x] Implement a configurable HTTPS client using `EXPO_PUBLIC_TRANSCRIPTION_API_URL`, multipart audio upload, timeout, and response validation; never embed an API key.
+- [x] Provide offline/manual review when no endpoint exists or a request fails.
+- [x] Create a review route where transcript and category are editable and job/proposed action are visible before save. Job reassignment remains in the consequential workflow milestone.
+- [x] Add deterministic keyword extraction with confidence and tests for time, safety, materials, note, communication, ambiguous, and empty transcripts.
 - [ ] Require explicit confirmation before creating time or safety records; write audit events linking derived records to the voice log.
-- [ ] Run tests and `bun run verify`; commit as `feat: add reviewable transcription workflow`.
+- [x] Run tests and `bun run verify`; commit as `feat: add reviewable transcription workflow`.
 
 ## Milestone 6: Consequential record workflows
 

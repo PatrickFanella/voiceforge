@@ -1,9 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/colors';
+import { extractVoiceIntent } from '@/features/voice/extract-intent';
+import { createTranscriptionClient } from '@/features/voice/transcription';
 import { useApp } from '@/providers/AppProvider';
 import type { VoiceLog } from '@/types';
 
@@ -17,6 +19,33 @@ export default function VoiceReviewScreen() {
   const [transcript, setTranscript] = useState('');
   const [category, setCategory] = useState<VoiceLog['category']>('note');
   const [saving, setSaving] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
+  const [provider, setProvider] = useState('manual');
+  const [transcriptionConfidence, setTranscriptionConfidence] = useState<number | null>(null);
+  const intent = useMemo(() => extractVoiceIntent(transcript), [transcript]);
+
+  useEffect(() => {
+    const endpoint = process.env.EXPO_PUBLIC_TRANSCRIPTION_API_URL;
+    if (!endpoint || !audioUri) return;
+    let active = true;
+    setTranscribing(true);
+    createTranscriptionClient({ endpoint }).transcribe(audioUri).then((result) => {
+      if (!active) return;
+      const extracted = extractVoiceIntent(result.transcript);
+      setTranscript(result.transcript);
+      setCategory(extracted.category);
+      setProvider(result.provider);
+      setTranscriptionConfidence(result.confidence);
+    }).catch((error: unknown) => {
+      if (active) setTranscriptionError(error instanceof Error ? error.message : 'Automatic transcription failed');
+    }).finally(() => {
+      if (active) setTranscribing(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [audioUri]);
 
   const save = async () => {
     if (!transcript.trim()) {
@@ -33,7 +62,8 @@ export default function VoiceReviewScreen() {
         processed: true,
         jobId: app.activeJobId ?? undefined,
         audioUri,
-        provider: 'manual',
+        confidence: transcriptionConfidence ?? intent.confidence,
+        provider,
       });
       router.replace('/(tabs)/voice-logs');
     } catch (error) {
@@ -47,7 +77,12 @@ export default function VoiceReviewScreen() {
     <ScrollView style={[styles.container, { paddingTop: insets.top }]} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.eyebrow}>REVIEW REQUIRED</Text>
       <Text style={styles.title}>Confirm the field note</Text>
-      <Text style={styles.body}>Automatic transcription is not configured, so enter the transcript manually. The audio remains on this device.</Text>
+      <Text style={styles.body}>
+        {transcribing
+          ? 'Transcribing through your configured endpoint…'
+          : 'Review every word before saving. When no endpoint is configured, enter the transcript manually.'}
+      </Text>
+      {transcriptionError ? <Text style={styles.warning}>Automatic transcription unavailable: {transcriptionError}. Manual review is still available.</Text> : null}
 
       <Text style={styles.label}>Transcript</Text>
       <TextInput
@@ -76,6 +111,14 @@ export default function VoiceReviewScreen() {
       </View>
 
       <Text style={styles.context}>Job: {app.activeJob?.title ?? 'No active job'}</Text>
+      <View style={styles.proposal}>
+        <Text style={styles.proposalTitle}>Suggested intent · {Math.round(intent.confidence * 100)}% confidence</Text>
+        <Text style={styles.proposalBody}>
+          {intent.consequentialAction
+            ? `Potential ${intent.consequentialAction} record. Saving here creates only the voice log; a separate confirmation is required for the record.`
+            : 'No consequential time or safety action will be created.'}
+        </Text>
+      </View>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel="Save reviewed voice log" disabled={saving} style={styles.save} onPress={() => void save()}>
         <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save reviewed log'}</Text>
       </TouchableOpacity>
@@ -92,6 +135,7 @@ const styles = StyleSheet.create({
   eyebrow: { color: Colors.dark.warning, fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginTop: 16 },
   title: { color: Colors.dark.text, fontSize: 27, fontWeight: '700', marginTop: 8 },
   body: { color: Colors.dark.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 9 },
+  warning: { color: Colors.dark.warning, fontSize: 12, lineHeight: 18, marginTop: 10 },
   label: { color: Colors.dark.text, fontSize: 13, fontWeight: '700', marginTop: 24, marginBottom: 8 },
   input: { minHeight: 150, borderColor: Colors.dark.border, borderWidth: 1, borderRadius: 14, backgroundColor: Colors.dark.surface, color: Colors.dark.text, padding: 14, fontSize: 15, lineHeight: 21, textAlignVertical: 'top' },
   categories: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -100,6 +144,9 @@ const styles = StyleSheet.create({
   categoryText: { color: Colors.dark.textMuted, fontSize: 12, textTransform: 'capitalize' },
   categoryTextActive: { color: Colors.dark.accent, fontWeight: '700' },
   context: { color: Colors.dark.textMuted, fontSize: 12, marginTop: 24 },
+  proposal: { backgroundColor: Colors.dark.surface, borderColor: Colors.dark.border, borderWidth: 1, borderRadius: 12, padding: 13, marginTop: 12 },
+  proposalTitle: { color: Colors.dark.text, fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
+  proposalBody: { color: Colors.dark.textMuted, fontSize: 11, lineHeight: 17, marginTop: 4 },
   save: { backgroundColor: Colors.dark.accent, borderRadius: 14, minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: 18 },
   saveText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   cancel: { minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
