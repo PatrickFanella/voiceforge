@@ -3,20 +3,19 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "bunx rork start -p br8w32qx0bjc6k5jqxf4i --tunnel",
-    "start-web": "bunx rork start -p br8w32qx0bjc6k5jqxf4i --web --tunnel",
-    "start-web-dev": "DEBUG=expo* bunx rork start -p br8w32qx0bjc6k5jqxf4i --web --tunnel",
+    "start": "bunx expo start --tunnel",
+    "start-web": "bunx expo start --web",
+    "start-web-dev": "DEBUG=expo* bunx expo start --web --clear",
     "lint": "expo lint",
-    "typecheck": "bunx tsc --noEmit",
+    "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "export:web": "expo export --platform web --clear",
-    "verify": "bun scripts/verify.mjs"
+    "export:web": "expo export --platform web --clear --max-workers 1",
+    "verify": "bash scripts/verify.sh"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@nkzw/create-context-hook": "^1.1.0",
-    "@rork-ai/toolkit-sdk": "^0.2.51",
     "@stardazed/streams-text-encoding": "^1.0.2",
     "@tanstack/react-query": "^5.83.0",
     "@ungap/structured-clone": "^1.3.0",
