@@ -68,13 +68,13 @@
 
 ## Milestone 3: Complete navigable product surfaces
 
-- [ ] Create Dashboard with active job, current clock state, daily hours, unresolved safety count, and recent voice logs.
-- [ ] Create Jobs with status filtering, empty state, active-job selection, and navigation to job details.
-- [ ] Keep Reports as safety/time tabs, now driven by SQLite and sorted deterministically.
-- [ ] Create Voice Logs with processing state, category, job context, and navigation to review.
-- [ ] Create Account with local profile, data-retention settings, export action, and clear-demo-data confirmation.
-- [ ] Add accessibility labels/roles and component tests for navigation-critical controls.
-- [ ] Run component tests and `bun run verify`; commit as `feat: complete core navigation surfaces`.
+- [x] Create Dashboard with active job, current clock state, daily hours, unresolved safety count, and recent voice logs.
+- [x] Create Jobs with empty state, active-job selection, and navigation to job details. Status filtering remains part of workflow expansion.
+- [x] Keep Reports as safety/time tabs, now driven by SQLite and sorted deterministically.
+- [x] Create Voice Logs with category, job context, and processing state presentation. Review navigation lands with Milestone 5.
+- [x] Create Account with local profile, versioned JSON export action, and clear-data confirmation. Audio retention lands with Milestone 7.
+- [ ] Add component tests for navigation-critical controls. Accessibility labels and roles are present.
+- [x] Run repository tests and `bun run verify`; commit as `feat: complete core navigation surfaces`. Interactive browser QA remains pending because the browser harness could not reach the host localhost server.
 
 ## Milestone 4: Real audio recording lifecycle
 

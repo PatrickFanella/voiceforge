@@ -140,6 +140,37 @@ export class VoiceForgeRepository {
     );
   }
 
+  async exportSnapshot() {
+    const [jobs, timeEntries, safetyReports, voiceLogs] = await Promise.all([
+      this.getJobs(),
+      this.getTimeEntries(),
+      this.getSafetyReports(),
+      this.getVoiceLogs(),
+    ]);
+    return {
+      schemaVersion: 1,
+      exportedAt: nowIso(),
+      jobs,
+      timeEntries,
+      safetyReports,
+      voiceLogs,
+    };
+  }
+
+  async clearUserData(): Promise<void> {
+    await this.db.withTransactionAsync(async () => {
+      await this.db.execAsync(`
+        DELETE FROM audit_events;
+        DELETE FROM time_entries;
+        DELETE FROM safety_reports;
+        DELETE FROM voice_logs;
+        DELETE FROM jobs;
+        DELETE FROM settings;
+      `);
+      await this.setSetting('demo_seeded', true);
+    });
+  }
+
   async seedDemoData(data: {
     jobs: Job[];
     timeEntries: TimeEntry[];

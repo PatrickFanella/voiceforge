@@ -1,386 +1,96 @@
-import React, { useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SectionList,
-  TouchableOpacity,
-} from 'react-native';
+import { Clock, Mic, ShieldAlert, Wrench } from 'lucide-react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  Shield,
-  Clock,
-  AlertTriangle,
-  CheckCircle,
-  Eye,
-  FileCheck,
-  Mic,
-} from 'lucide-react-native';
+
+import VoiceButton from '@/components/VoiceButton';
+import { ScreenState } from '@/components/ScreenState';
 import { Colors } from '@/constants/colors';
 import { useApp } from '@/providers/AppProvider';
-import VoiceButton from '@/components/VoiceButton';
-import * as Haptics from 'expo-haptics';
 
-type TabType = 'safety' | 'time';
-
-const severityConfig: Record<string, { color: string }> = {
-  low: { color: Colors.dark.success },
-  medium: { color: Colors.dark.warning },
-  high: { color: Colors.dark.accent },
-  critical: { color: Colors.dark.danger },
-};
-
-const typeConfig: Record<string, { icon: typeof Shield; label: string }> = {
-  incident: { icon: AlertTriangle, label: 'Incident' },
-  hazard: { icon: Eye, label: 'Hazard' },
-  inspection: { icon: Shield, label: 'Inspection' },
-  compliance: { icon: FileCheck, label: 'Compliance' },
-};
-
-export default function ReportsScreen() {
+export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
-  const { safetyReports, timeEntries } = useApp();
-  const [tab, setTab] = useState<TabType>('safety');
+  const app = useApp();
 
-  const safetySections = useMemo(() => {
-    const grouped: Record<string, typeof safetyReports> = {};
-    safetyReports.forEach(r => {
-      if (!grouped[r.date]) grouped[r.date] = [];
-      grouped[r.date].push(r);
-    });
-    return Object.entries(grouped).map(([date, data]) => ({ title: date, data }));
-  }, [safetyReports]);
+  if (!app.ready || app.loadError) {
+    return <ScreenState loading={!app.ready} error={app.loadError} />;
+  }
 
-  const timeSections = useMemo(() => {
-    const grouped: Record<string, typeof timeEntries> = {};
-    timeEntries.forEach(e => {
-      if (!grouped[e.date]) grouped[e.date] = [];
-      grouped[e.date].push(e);
-    });
-    return Object.entries(grouped).map(([date, data]) => ({
-      title: date,
-      data,
-      total: data.reduce((s, e) => s + e.hours, 0),
-    }));
-  }, [timeEntries]);
-
-  const handleTabPress = (t: TabType) => {
-    Haptics.selectionAsync();
-    setTab(t);
-  };
+  const unresolvedSafety = app.safetyReports.filter((report) => !report.resolved).length;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Reports</Text>
-      </View>
+    <View style={[styles.container, { paddingTop: insets.top }]}> 
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.eyebrow}>VOICEFORGE</Text>
+        <Text style={styles.title}>Good work starts with a clear record.</Text>
 
-      <View style={styles.tabs}>
+        <View style={styles.activeCard}>
+          <View style={styles.row}>
+            <Wrench color={Colors.dark.accent} size={20} />
+            <Text style={styles.cardLabel}>Active job</Text>
+          </View>
+          <Text style={styles.activeTitle}>{app.activeJob?.title ?? 'No active job selected'}</Text>
+          <Text style={styles.muted}>{app.activeJob?.client ?? 'Choose a job from the Jobs tab.'}</Text>
+        </View>
+
         <TouchableOpacity
-          style={[styles.tab, tab === 'safety' && styles.tabActive]}
-          onPress={() => handleTabPress('safety')}
+          accessibilityRole="button"
+          accessibilityLabel={app.clockedIn ? 'Clock out' : 'Clock in'}
+          style={[styles.clockButton, app.clockedIn && styles.clockedIn]}
+          onPress={() => void app.toggleClock()}
         >
-          <Shield size={16} color={tab === 'safety' ? Colors.dark.accent : Colors.dark.textMuted} />
-          <Text style={[styles.tabText, tab === 'safety' && styles.tabTextActive]}>Safety</Text>
+          <Clock color="#fff" size={22} />
+          <Text style={styles.clockText}>{app.clockedIn ? 'Clock out' : 'Clock in'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'time' && styles.tabActive]}
-          onPress={() => handleTabPress('time')}
-        >
-          <Clock size={16} color={tab === 'time' ? Colors.dark.accent : Colors.dark.textMuted} />
-          <Text style={[styles.tabText, tab === 'time' && styles.tabTextActive]}>Time Log</Text>
-        </TouchableOpacity>
-      </View>
 
-      {tab === 'safety' ? (
-        <SectionList
-          sections={safetySections}
-          keyExtractor={(item) => item.id}
-          renderSectionHeader={({ section }) => (
-            <Text style={styles.sectionDate}>{section.title}</Text>
-          )}
-          renderItem={({ item }) => {
-            const typeInfo = typeConfig[item.type];
-            const severity = severityConfig[item.severity];
-            const TypeIcon = typeInfo?.icon ?? Shield;
-            return (
-              <View style={styles.reportCard}>
-                <View style={styles.reportTop}>
-                  <View style={styles.reportTypeRow}>
-                    <View style={[styles.typeIcon, { backgroundColor: severity.color + '20' }]}>
-                      <TypeIcon size={14} color={severity.color} />
-                    </View>
-                    <Text style={styles.reportType}>{typeInfo?.label ?? item.type}</Text>
-                    <View style={[styles.severityDot, { backgroundColor: severity.color }]} />
-                    <Text style={[styles.severityText, { color: severity.color }]}>
-                      {item.severity.toUpperCase()}
-                    </Text>
-                  </View>
-                  {item.voiceLogged && <Mic size={12} color={Colors.dark.textMuted} />}
-                </View>
-                <Text style={styles.reportDesc}>{item.description}</Text>
-                <View style={styles.reportBottom}>
-                  <Text style={styles.reportJob}>{item.jobTitle}</Text>
-                  {item.resolved && (
-                    <View style={styles.resolvedBadge}>
-                      <CheckCircle size={11} color={Colors.dark.success} />
-                      <Text style={styles.resolvedText}>Resolved</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            );
-          }}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          stickySectionHeadersEnabled={false}
-        />
-      ) : (
-        <SectionList
-          sections={timeSections}
-          keyExtractor={(item) => item.id}
-          renderSectionHeader={({ section }) => (
-            <View style={styles.timeSectionHeader}>
-              <Text style={styles.sectionDate}>{section.title}</Text>
-              <Text style={styles.sectionTotal}>
-                {(section as any).total?.toFixed(1)}h
-              </Text>
-            </View>
-          )}
-          renderItem={({ item }) => (
-            <View style={styles.timeCard}>
-              <View style={styles.timeLeft}>
-                <View style={styles.timeRange}>
-                  <Text style={styles.timeStart}>{item.startTime}</Text>
-                  <View style={styles.timeLine} />
-                  <Text style={styles.timeEnd}>{item.endTime}</Text>
-                </View>
-              </View>
-              <View style={styles.timeRight}>
-                <Text style={styles.timeJob}>{item.jobTitle}</Text>
-                <Text style={styles.timeNote}>{item.notes}</Text>
-                <View style={styles.timeMetaRow}>
-                  <Text style={styles.timeHours}>{item.hours}h</Text>
-                  {item.type === 'overtime' && (
-                    <View style={styles.otBadge}>
-                      <Text style={styles.otText}>OT</Text>
-                    </View>
-                  )}
-                  {item.voiceLogged && <Mic size={11} color={Colors.dark.textMuted} />}
-                </View>
-              </View>
-            </View>
-          )}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          stickySectionHeadersEnabled={false}
-        />
-      )}
+        <View style={styles.metrics}>
+          <Metric icon={Clock} label="Today" value={`${app.todayHours.toFixed(1)}h`} />
+          <Metric icon={Wrench} label="Active jobs" value={String(app.activeJobs.length)} />
+          <Metric icon={ShieldAlert} label="Open safety" value={String(unresolvedSafety)} />
+          <Metric icon={Mic} label="Voice logs" value={String(app.voiceLogs.length)} />
+        </View>
 
+        <Text style={styles.sectionTitle}>Recent voice logs</Text>
+        {app.voiceLogs.slice(0, 3).map((log) => (
+          <View key={log.id} style={styles.logCard}>
+            <Text style={styles.logCategory}>{log.category.toUpperCase()}</Text>
+            <Text style={styles.logText} numberOfLines={2}>{log.transcript}</Text>
+          </View>
+        ))}
+      </ScrollView>
       <VoiceButton />
     </View>
   );
 }
 
+function Metric({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: string }) {
+  return (
+    <View style={styles.metric}>
+      <Icon color={Colors.dark.accent} size={18} />
+      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.dark.background,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700' as const,
-    color: Colors.dark.text,
-  },
-  tabs: {
-    flexDirection: 'row',
-    marginHorizontal: 20,
-    marginBottom: 16,
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  tabActive: {
-    backgroundColor: Colors.dark.accentDim,
-  },
-  tabText: {
-    fontSize: 14,
-    color: Colors.dark.textMuted,
-    fontWeight: '500' as const,
-  },
-  tabTextActive: {
-    color: Colors.dark.accent,
-    fontWeight: '600' as const,
-  },
-  list: {
-    paddingHorizontal: 20,
-    paddingBottom: 100,
-  },
-  sectionDate: {
-    fontSize: 13,
-    color: Colors.dark.textMuted,
-    fontWeight: '600' as const,
-    marginBottom: 8,
-    marginTop: 8,
-  },
-  reportCard: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  reportTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  reportTypeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  typeIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reportType: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: Colors.dark.text,
-  },
-  severityDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    marginLeft: 4,
-  },
-  severityText: {
-    fontSize: 10,
-    fontWeight: '700' as const,
-    letterSpacing: 0.5,
-  },
-  reportDesc: {
-    fontSize: 13,
-    color: Colors.dark.textSecondary,
-    lineHeight: 19,
-  },
-  reportBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  reportJob: {
-    fontSize: 11,
-    color: Colors.dark.textMuted,
-  },
-  resolvedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  resolvedText: {
-    fontSize: 11,
-    color: Colors.dark.success,
-    fontWeight: '500' as const,
-  },
-  timeSectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-    marginTop: 8,
-  },
-  sectionTotal: {
-    fontSize: 14,
-    fontWeight: '700' as const,
-    color: Colors.dark.accent,
-  },
-  timeCard: {
-    flexDirection: 'row',
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    gap: 14,
-  },
-  timeLeft: {
-    alignItems: 'center',
-  },
-  timeRange: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  timeStart: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    color: Colors.dark.text,
-  },
-  timeLine: {
-    width: 1,
-    height: 16,
-    backgroundColor: Colors.dark.borderLight,
-  },
-  timeEnd: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    color: Colors.dark.textSecondary,
-  },
-  timeRight: {
-    flex: 1,
-  },
-  timeJob: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: Colors.dark.text,
-  },
-  timeNote: {
-    fontSize: 13,
-    color: Colors.dark.textSecondary,
-    marginTop: 3,
-  },
-  timeMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-  },
-  timeHours: {
-    fontSize: 13,
-    fontWeight: '700' as const,
-    color: Colors.dark.accent,
-  },
-  otBadge: {
-    backgroundColor: Colors.dark.warningDim,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  otText: {
-    fontSize: 10,
-    fontWeight: '700' as const,
-    color: Colors.dark.warning,
-  },
+  container: { flex: 1, backgroundColor: Colors.dark.background },
+  content: { padding: 20, paddingBottom: 110 },
+  eyebrow: { color: Colors.dark.accent, fontSize: 12, fontWeight: '800', letterSpacing: 2 },
+  title: { color: Colors.dark.text, fontSize: 28, fontWeight: '700', lineHeight: 34, marginTop: 8, marginBottom: 22 },
+  activeCard: { backgroundColor: Colors.dark.surface, borderColor: Colors.dark.border, borderWidth: 1, borderRadius: 16, padding: 18 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardLabel: { color: Colors.dark.textSecondary, fontSize: 13, fontWeight: '600' },
+  activeTitle: { color: Colors.dark.text, fontSize: 20, fontWeight: '700', marginTop: 14 },
+  muted: { color: Colors.dark.textMuted, fontSize: 13, marginTop: 4 },
+  clockButton: { marginTop: 14, backgroundColor: Colors.dark.accent, borderRadius: 14, padding: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 9 },
+  clockedIn: { backgroundColor: Colors.dark.danger },
+  clockText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 18 },
+  metric: { width: '48%', backgroundColor: Colors.dark.surface, borderRadius: 14, padding: 14, borderColor: Colors.dark.border, borderWidth: 1 },
+  metricValue: { color: Colors.dark.text, fontSize: 22, fontWeight: '800', marginTop: 8 },
+  metricLabel: { color: Colors.dark.textMuted, fontSize: 12, marginTop: 2 },
+  sectionTitle: { color: Colors.dark.text, fontSize: 18, fontWeight: '700', marginTop: 24, marginBottom: 10 },
+  logCard: { backgroundColor: Colors.dark.surface, borderRadius: 12, padding: 14, marginBottom: 8 },
+  logCategory: { color: Colors.dark.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  logText: { color: Colors.dark.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 5 },
 });

@@ -71,4 +71,25 @@ describe('VoiceForge database', () => {
       ),
     ).rejects.toThrow();
   });
+
+  it('exports a versioned snapshot and clears user data', async () => {
+    await repository.seedDemoData({
+      jobs: mockJobs,
+      timeEntries: mockTimeEntries,
+      safetyReports: mockSafetyReports,
+      voiceLogs: mockVoiceLogs,
+    });
+
+    const snapshot = await repository.exportSnapshot();
+    expect(snapshot.schemaVersion).toBe(1);
+    expect(snapshot.jobs).toHaveLength(mockJobs.length);
+    expect(snapshot.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+    await repository.clearUserData();
+    expect(await repository.getJobs()).toEqual([]);
+    expect(await repository.getTimeEntries()).toEqual([]);
+    expect(await repository.getSafetyReports()).toEqual([]);
+    expect(await repository.getVoiceLogs()).toEqual([]);
+    expect(await repository.getSetting('demo_seeded', false)).toBe(true);
+  });
 });

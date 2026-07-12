@@ -88,6 +88,23 @@ export const [AppProvider, useApp] = createContextHook(() => {
     setActiveJobId(jobId);
   }, []);
 
+  const exportData = useCallback(async () => {
+    const repository = await getRepository();
+    return repository.exportSnapshot();
+  }, []);
+
+  const clearData = useCallback(async () => {
+    const repository = await getRepository();
+    await repository.clearUserData();
+    setJobs([]);
+    setTimeEntries([]);
+    setSafetyReports([]);
+    setVoiceLogs([]);
+    setClockedIn(false);
+    setClockInTime(null);
+    setActiveJobId(null);
+  }, []);
+
   const worker = mockWorker;
   const activeJob = jobs.find(j => j.id === activeJobId) ?? null;
   const todayEntries = timeEntries.filter(e => e.date === getLocalDateKey());
@@ -112,5 +129,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
     activeJobs,
     ready,
     loadError,
+    exportData,
+    clearData,
   };
 });
