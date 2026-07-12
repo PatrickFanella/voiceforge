@@ -1,5 +1,7 @@
 import { createAuth0TokenVerifier } from '@voiceforge/auth';
-import { createDatabase, JobRepository, SafetyRepository, SyncRepository, TenancyRepository, TimeRepository, TranscriptionRepository } from '@voiceforge/database';
+import { BillingRepository, createDatabase, JobRepository, SafetyRepository, SyncRepository, TenancyRepository, TimeRepository, TranscriptionRepository } from '@voiceforge/database';
+import Stripe from 'stripe';
+import { StripeBillingGateway } from './services/stripe-gateway.js';
 import { S3Client } from '@aws-sdk/client-s3';
 import { Queue, type ConnectionOptions } from 'bullmq';
 import { buildApp } from './app.js';
@@ -48,6 +50,7 @@ const app = await buildApp({
       delay: Math.max(0, at.getTime() - Date.now()), attempts: 5, backoff: { type: 'exponential', delay: 2_000 }, removeOnComplete: 1_000,
     }); } },
   },
+  billing: { repository: new BillingRepository(database.db), stripe: new StripeBillingGateway(new Stripe(required('STRIPE_SECRET_KEY')), required('STRIPE_TEAM_PRICE_ID'), required('STRIPE_WEBHOOK_SECRET')) },
 });
 const port = Number.parseInt(process.env.PORT ?? '3000', 10);
 

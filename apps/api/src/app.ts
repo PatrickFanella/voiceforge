@@ -18,6 +18,9 @@ import { registerTimeRoutes } from './routes/time.js';
 import { SafetyWorkflowError } from '@voiceforge/workflows';
 import type { SafetyRepository } from '@voiceforge/database';
 import { registerSafetyRoutes, type SafetyQueue } from './routes/safety.js';
+import rawBody from 'fastify-raw-body';
+import { registerBillingRoutes, type StripeGateway } from './routes/billing.js';
+import type { BillingRepository } from '@voiceforge/database';
 
 export interface AppDependencies {
   verifier: TokenVerifier;
@@ -35,6 +38,7 @@ export interface AppDependencies {
     repository: Pick<SafetyRepository, 'registerPushToken' | 'configurePolicy' | 'configureContacts' | 'createDraft' | 'submit' | 'acknowledge' | 'transition' | 'correct' | 'assign' | 'silence' | 'listTriage' | 'listDeliveries'>;
     queue: SafetyQueue;
   };
+  billing?: { repository: Pick<BillingRepository, 'get' | 'saveCustomer' | 'findCustomer' | 'setPendingSeatQuantity' | 'reconcile'>; stripe: StripeGateway };
 }
 
 export async function buildApp(dependencies?: AppDependencies) {
@@ -48,6 +52,7 @@ export async function buildApp(dependencies?: AppDependencies) {
     },
   });
   await app.register(swaggerUi, { routePrefix: '/documentation' });
+  await app.register(rawBody, { field: 'rawBody', global: false, encoding: false, runFirst: true });
 
   app.get('/v1/health', {
     schema: {
@@ -63,6 +68,18 @@ export async function buildApp(dependencies?: AppDependencies) {
   }));
 
   if (dependencies) {
+    const billing = dependencies.billing;
+    if (billing) app.addHook('preHandler', async (request) => {
+      if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) || request.url.startsWith('/v1/billing/') || request.url === '/v1/auth/bootstrap' || request.url === '/v1/workspaces' || request.url === '/v1/invitations/accept') return;
+      const params = request.params as { workspaceId?: string }; const body = request.body as { workspaceId?: string } | undefined; const workspaceId = params.workspaceId ?? body?.workspaceId;
+      if (!workspaceId) return;
+      const header = request.headers.authorization; if (!header?.startsWith('Bearer ')) return;
+      const claims = await dependencies.verifier.verify(header.slice(7));
+      const bootstrap = await dependencies.tenancy.bootstrapIdentity({ subject: claims.subject, ...(claims.email ? { email: claims.email } : {}) });
+      const access = await dependencies.tenancy.getAccess(bootstrap.user.id, workspaceId); if (!access || access.kind !== 'team') return;
+      const state = await billing.repository.get(workspaceId);
+      if (!state.entitlement.mutationEnabled) throw new AuthorizationError('workspace:manage');
+    });
     await registerTenancyRoutes(app, { verifier: dependencies.verifier, store: dependencies.tenancy });
     if (dependencies.jobs) await registerJobRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, jobs: dependencies.jobs });
     if (dependencies.jobs && dependencies.sync && dependencies.cursorSecret) await registerSyncRoutes(app, {
@@ -76,6 +93,7 @@ export async function buildApp(dependencies?: AppDependencies) {
     });
     if (dependencies.time) await registerTimeRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, repository: dependencies.time });
     if (dependencies.safety) await registerSafetyRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, ...dependencies.safety });
+    if (dependencies.billing) await registerBillingRoutes(app, { verifier: dependencies.verifier, tenancy: dependencies.tenancy, ...dependencies.billing });
   }
 
   app.setNotFoundHandler((request, reply) => reply.code(404).send({

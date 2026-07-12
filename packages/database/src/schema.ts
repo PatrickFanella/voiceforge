@@ -41,6 +41,7 @@ export const safetyReportStatus = pgEnum('safety_report_status', ['draft', 'subm
 export const safetySeverity = pgEnum('safety_severity', ['low', 'medium', 'high', 'critical']);
 export const deliveryChannel = pgEnum('delivery_channel', ['push', 'email']);
 export const deliveryStatus = pgEnum('delivery_status', ['queued', 'sent', 'failed', 'suppressed', 'dead_letter']);
+export const subscriptionStatus = pgEnum('subscription_status', ['incomplete', 'trialing', 'active', 'past_due', 'unpaid', 'paused', 'canceled']);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey(),
@@ -365,3 +366,46 @@ export const idempotencyKeys = pgTable('idempotency_keys', {
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   ...timestamps(),
 }, (table) => [primaryKey({ columns: [table.workspaceId, table.key] })]);
+
+export const subscriptions = pgTable('subscriptions', {
+  workspaceId: uuid('workspace_id').primaryKey().references(() => workspaces.id, { onDelete: 'cascade' }),
+  stripeCustomerId: text('stripe_customer_id').notNull(),
+  stripeSubscriptionId: text('stripe_subscription_id'),
+  stripeSubscriptionItemId: text('stripe_subscription_item_id'),
+  stripePriceId: text('stripe_price_id'),
+  status: subscriptionStatus('status').notNull().default('incomplete'),
+  seatQuantity: integer('seat_quantity').notNull().default(1),
+  pendingSeatQuantity: integer('pending_seat_quantity'),
+  currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
+  graceUntil: timestamp('grace_until', { withTimezone: true }),
+  cancelAtPeriodEnd: boolean('cancel_at_period_end').notNull().default(false),
+  lastStripeEventCreated: timestamp('last_stripe_event_created', { withTimezone: true }),
+  ...timestamps(),
+}, (table) => [uniqueIndex('subscriptions_customer_unique').on(table.stripeCustomerId), uniqueIndex('subscriptions_stripe_id_unique').on(table.stripeSubscriptionId)]);
+
+export const entitlements = pgTable('entitlements', {
+  workspaceId: uuid('workspace_id').primaryKey().references(() => workspaces.id, { onDelete: 'cascade' }),
+  source: text('source').notNull(),
+  readEnabled: boolean('read_enabled').notNull().default(true),
+  exportEnabled: boolean('export_enabled').notNull().default(true),
+  mutationEnabled: boolean('mutation_enabled').notNull().default(false),
+  seatLimit: integer('seat_limit').notNull().default(1),
+  ...timestamps(),
+});
+
+export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
+  eventId: text('event_id').primaryKey(),
+  eventType: text('event_type').notNull(),
+  eventCreated: timestamp('event_created', { withTimezone: true }).notNull(),
+  payload: jsonb('payload').notNull(),
+  processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const usageCounters = pgTable('usage_counters', {
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  period: text('period').notNull(),
+  activeSeats: integer('active_seats').notNull().default(0),
+  audioMinutes: integer('audio_minutes').notNull().default(0),
+  exportCount: integer('export_count').notNull().default(0),
+  ...timestamps(),
+}, (table) => [primaryKey({ columns: [table.workspaceId, table.period] })]);

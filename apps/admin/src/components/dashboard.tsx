@@ -13,6 +13,7 @@ type Member = { userId: string; displayName: string | null; email: string | null
 type TimeEntry = { id: string; workerUserId: string; status: string; totalMinutes: number; startedAt: string; endedAt: string; notes: string };
 type SafetyReport = { id: string; severity: string; status: string; reportType: string; description: string; acknowledgementDueAt: string | null; escalationLevel: number };
 type Delivery = { id: string; channel: string; destination: string; eventType: string; status: string; attemptCount: number; lastError: string | null };
+type BillingState = { subscription: null | { status: string; seatQuantity: number; pendingSeatQuantity: number | null; currentPeriodEnd: string | null }; entitlement: { mutationEnabled: boolean; seatLimit: number }; activeSeats: number };
 
 export function Dashboard({ userName }: { userName: string }) {
   const [view, setView] = useState<View>('overview');
@@ -23,6 +24,7 @@ export function Dashboard({ userName }: { userName: string }) {
   const [safety, setSafety] = useState<SafetyReport[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [jobs, setJobs] = useState<Array<{ id: string; name: string; status: string; address: string | null }>>([]);
+  const [billing, setBilling] = useState<BillingState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState('');
@@ -61,14 +63,15 @@ export function Dashboard({ userName }: { userName: string }) {
     if (!workspaceId) return;
     setError(null);
     const safe = async <T,>(path: string, fallback: T) => { try { return await request<T>(path); } catch { return fallback; } };
-    const [memberData, jobData, timeData, safetyData, deliveryData] = await Promise.all([
+    const [memberData, jobData, timeData, safetyData, deliveryData, billingData] = await Promise.all([
       safe<{ data: Member[] }>(`/v1/workspaces/${workspaceId}/memberships`, { data: [] }),
       safe<{ data: typeof jobs }>(`/v1/workspaces/${workspaceId}/jobs`, { data: [] }),
       safe<{ data: TimeEntry[] }>(`/v1/time-approvals?workspaceId=${workspaceId}`, { data: [] }),
       safe<{ data: SafetyReport[] }>(`/v1/safety-reports?workspaceId=${workspaceId}`, { data: [] }),
       safe<{ data: Delivery[] }>(`/v1/admin/delivery-diagnostics?workspaceId=${workspaceId}`, { data: [] }),
+      safe<BillingState | null>(`/v1/billing/status?workspaceId=${workspaceId}`, null),
     ]);
-    setMembers(memberData.data); setJobs(jobData.data); setTimeEntries(timeData.data); setSafety(safetyData.data); setDeliveries(deliveryData.data);
+    setMembers(memberData.data); setJobs(jobData.data); setTimeEntries(timeData.data); setSafety(safetyData.data); setDeliveries(deliveryData.data); setBilling(billingData);
   }, [request, workspaceId]);
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -96,7 +99,8 @@ export function Dashboard({ userName }: { userName: string }) {
       {view === 'safety' && (supervisor ? <Panel title="Safety triage board"><SafetyTable data={safety} workspaceId={workspaceId} mutate={mutate} /></Panel> : <Restricted />)}
       {view === 'deliveries' && <Panel title="Delivery diagnostics"><table><thead><tr><th>Channel</th><th>Destination</th><th>Event</th><th>Status</th><th>Attempts</th></tr></thead><tbody>{deliveries.map((item) => <tr key={item.id}><td>{item.channel}</td><td>{item.destination}</td><td>{item.eventType}</td><td><Status value={item.status} /></td><td>{item.attemptCount}</td></tr>)}</tbody></table></Panel>}
       {view === 'policies' && <PolicyPanel workspaceId={workspaceId} mutate={mutate} />}
-      {(['audit', 'integrations', 'billing'] as View[]).includes(view) && <Panel title={NAV_ITEMS.find(([id]) => id === view)?.[1] ?? view}><p className="muted">This control surface is connected as its backend milestone lands. Current access remains read-only and no settings are implied.</p></Panel>}
+      {view === 'billing' && (workspace?.kind === 'team' && workspace.role === 'owner' ? <BillingPanel state={billing} workspaceId={workspaceId} request={request} /> : <Restricted />)}
+      {(['audit', 'integrations'] as View[]).includes(view) && <Panel title={NAV_ITEMS.find(([id]) => id === view)?.[1] ?? view}><p className="muted">This control surface is connected as its backend milestone lands. Current access remains read-only and no settings are implied.</p></Panel>}
     </main>
   </div>;
 }
@@ -112,3 +116,7 @@ function TeamPanel({ members, workspaceId, mutate }: { members: Member[]; worksp
   return <div className="grid"><Panel title="Members"><table><thead><tr><th>Member</th><th>Role</th><th>Status</th></tr></thead><tbody>{members.map((member) => <tr key={member.userId}><td><strong>{member.displayName || member.email || 'Unnamed'}</strong><small>{member.email}</small></td><td><select value={member.role} onChange={(event) => void mutate(`/v1/workspaces/${workspaceId}/memberships/${member.userId}`, { workspaceId, role: event.target.value }, 'PATCH')}>{['owner', 'admin', 'supervisor', 'worker', 'auditor'].map((role) => <option key={role}>{role}</option>)}</select></td><td><Status value={member.status} /></td></tr>)}</tbody></table></Panel><Panel title="Invite teammate"><form onSubmit={(event) => void invite(event)}><label>Email<input name="email" type="email" required /></label><label>Role<select name="role" defaultValue="worker"><option>worker</option><option>supervisor</option><option>auditor</option><option>admin</option></select></label><button type="submit">Send invitation</button></form></Panel></div>;
 }
 function PolicyPanel({ workspaceId, mutate }: { workspaceId: string; mutate: (path: string, body: unknown, method?: string) => Promise<void> }) { return <Panel title="Safety escalation policy"><form onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); void mutate('/v1/admin/safety-policy', { workspaceId, acknowledgementSlaMinutes: Number(data.get('sla')), escalationRepeatMinutes: Number(data.get('repeat')), emergencyInstructions: data.get('emergency') }, 'PUT'); }}><label>Acknowledgement SLA (minutes)<input name="sla" type="number" min="1" max="1440" defaultValue="15" /></label><label>Repeat escalation (minutes)<input name="repeat" type="number" min="1" max="1440" defaultValue="15" /></label><label>Emergency instructions<textarea name="emergency" defaultValue="If anyone is in immediate danger, contact local emergency services now." /></label><button type="submit">Save policy</button></form></Panel>; }
+function BillingPanel({ state, workspaceId, request }: { state: BillingState | null; workspaceId: string; request: <T>(path: string, init?: RequestInit) => Promise<T> }) {
+  const redirect = async (path: string, body: unknown) => { const result = await request<{ url: string }>(path, { method: 'POST', body: JSON.stringify(body) }); window.location.assign(result.url); };
+  return <div className="grid"><Panel title="Subscription"><p><Status value={state?.subscription?.status ?? 'not_subscribed'} /></p><p className="muted">{state?.activeSeats ?? 1} active of {state?.entitlement.seatLimit ?? 1} seats{state?.subscription?.pendingSeatQuantity ? ` · ${state.subscription.pendingSeatQuantity} at renewal` : ''}</p>{state?.subscription ? <button onClick={() => void redirect('/v1/billing/portal', { workspaceId, returnUrl: window.location.href })}>Open billing portal</button> : <button onClick={() => void redirect('/v1/billing/checkout', { workspaceId, quantity: Math.max(1, state?.activeSeats ?? 1), successUrl: window.location.href, cancelUrl: window.location.href })}>Start team plan</button>}</Panel>{state?.subscription && <Panel title="Seat quantity"><form onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); void request('/v1/billing/seats', { method: 'POST', body: JSON.stringify({ workspaceId, quantity: Number(form.get('quantity')) }) }); }}><label>Seats<input name="quantity" type="number" min={state.activeSeats} defaultValue={state.subscription.seatQuantity} /></label><button type="submit">Update seats</button></form></Panel>}</div>;
+}
