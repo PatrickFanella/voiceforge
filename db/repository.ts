@@ -223,33 +223,39 @@ export class VoiceForgeRepository {
   }
 
   async updateTimeEntry(entry: TimeEntry): Promise<void> {
-    const result = await this.db.runAsync(
-      `UPDATE time_entries SET date = ?, start_time = ?, end_time = ?, hours = ?, type = ?, notes = ?, updated_at = ? WHERE id = ?`,
-      entry.date, entry.startTime, entry.endTime, entry.hours, entry.type, entry.notes, nowIso(), entry.id,
-    );
-    if (!result.changes) throw new Error('Time entry not found');
-    await this.writeAudit('time_entry', entry.id, 'updated', entry.sourceVoiceLogId);
+    await this.db.withTransactionAsync(async () => {
+      const result = await this.db.runAsync(
+        `UPDATE time_entries SET date = ?, start_time = ?, end_time = ?, hours = ?, type = ?, notes = ?, updated_at = ? WHERE id = ?`,
+        entry.date, entry.startTime, entry.endTime, entry.hours, entry.type, entry.notes, nowIso(), entry.id,
+      );
+      if (!result.changes) throw new Error('Time entry not found');
+      await this.writeAudit('time_entry', entry.id, 'updated', entry.sourceVoiceLogId);
+    });
   }
 
   async updateSafetyReport(report: SafetyReport): Promise<void> {
-    const result = await this.db.runAsync(
-      `UPDATE safety_reports SET type = ?, severity = ?, description = ?, resolved = ?, updated_at = ? WHERE id = ?`,
-      report.type, report.severity, report.description, report.resolved ? 1 : 0, nowIso(), report.id,
-    );
-    if (!result.changes) throw new Error('Safety report not found');
-    await this.writeAudit('safety_report', report.id, 'updated', report.sourceVoiceLogId);
+    await this.db.withTransactionAsync(async () => {
+      const result = await this.db.runAsync(
+        `UPDATE safety_reports SET type = ?, severity = ?, description = ?, resolved = ?, updated_at = ? WHERE id = ?`,
+        report.type, report.severity, report.description, report.resolved ? 1 : 0, nowIso(), report.id,
+      );
+      if (!result.changes) throw new Error('Safety report not found');
+      await this.writeAudit('safety_report', report.id, 'updated', report.sourceVoiceLogId);
+    });
   }
 
   async updateJob(job: Job): Promise<void> {
-    const result = await this.db.runAsync(
-      `UPDATE jobs SET title = ?, client = ?, address = ?, status = ?, trade = ?, priority = ?,
-        start_date = ?, due_date = ?, hours_logged = ?, hours_estimated = ?, notes_json = ?, crew_json = ?, updated_at = ?
-       WHERE id = ?`,
-      job.title, job.client, job.address, job.status, job.trade, job.priority, job.startDate, job.dueDate,
-      job.hoursLogged, job.hoursEstimated, JSON.stringify(job.notes), JSON.stringify(job.crew), nowIso(), job.id,
-    );
-    if (!result.changes) throw new Error('Job not found');
-    await this.writeAudit('job', job.id, 'updated');
+    await this.db.withTransactionAsync(async () => {
+      const result = await this.db.runAsync(
+        `UPDATE jobs SET title = ?, client = ?, address = ?, status = ?, trade = ?, priority = ?,
+          start_date = ?, due_date = ?, hours_logged = ?, hours_estimated = ?, notes_json = ?, crew_json = ?, updated_at = ?
+         WHERE id = ?`,
+        job.title, job.client, job.address, job.status, job.trade, job.priority, job.startDate, job.dueDate,
+        job.hoursLogged, job.hoursEstimated, JSON.stringify(job.notes), JSON.stringify(job.crew), nowIso(), job.id,
+      );
+      if (!result.changes) throw new Error('Job not found');
+      await this.writeAudit('job', job.id, 'updated');
+    });
   }
 
   async deleteJob(id: string): Promise<void> {

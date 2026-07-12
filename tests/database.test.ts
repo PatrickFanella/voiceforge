@@ -84,6 +84,7 @@ describe('VoiceForge database', () => {
     expect(snapshot.schemaVersion).toBe(2);
     expect(snapshot.jobs).toHaveLength(mockJobs.length);
     expect(snapshot.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(snapshot.auditEvents).toEqual([]);
 
     await repository.clearUserData();
     expect(await repository.getJobs()).toEqual([]);
@@ -134,6 +135,7 @@ describe('VoiceForge database', () => {
     expect(await repository.getSetting('clock_state', null)).toEqual({ clockedIn: false, clockInTime: null, jobId: null });
     expect(await repository.getTimeEntries()).toContainEqual(entry);
     expect(await repository.getAuditEvents()).toEqual(expect.arrayContaining([expect.objectContaining({ entityId: 'clock-entry', action: 'confirmed', details: expect.objectContaining({ source: 'clock' }) })]));
+    expect((await repository.exportSnapshot()).auditEvents).toEqual(expect.arrayContaining([expect.objectContaining({ entityId: 'clock-entry' })]));
   });
 
   it('updates jobs but protects deletion while consequential records reference them', async () => {
