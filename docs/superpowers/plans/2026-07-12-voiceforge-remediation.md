@@ -17,18 +17,18 @@
 
 ## Requirements and acceptance criteria
 
-- [ ] A clean checkout installs with `bun install --frozen-lockfile`.
-- [ ] `bun run verify` passes typecheck, lint, unit tests, and web export.
-- [ ] The route tree contains usable Dashboard, Jobs, Reports, Voice Logs, and Account surfaces.
-- [ ] Jobs, time entries, safety reports, voice logs, and settings survive restart in SQLite.
-- [ ] Clocking uses the actual local date and produces a reviewable time entry.
-- [ ] Voice capture requests permission, records real audio, handles denial/interruption, and retains or deletes audio deliberately.
-- [ ] Every recording enters a review step; no safety or time record is created without user confirmation.
-- [ ] Transcription is replaceable, timeout-aware, and functional with a configured endpoint; manual entry remains available offline.
-- [ ] Structured extraction is deterministic and confidence-bearing, with user-editable category and target job.
-- [ ] Errors, empty states, accessibility labels, and destructive confirmations are present on consequential workflows.
-- [ ] CI, EAS profiles, environment examples, privacy/retention documentation, architecture notes, and release instructions exist.
-- [ ] No credentials, provider secrets, live-trading behavior, or hidden production mutations are introduced. Live trading is non-applicable to VoiceForge.
+- [x] A clean checkout installs with `bun install --frozen-lockfile`.
+- [x] `bun run verify` passes typecheck, lint, 39 tests, and a cold web export.
+- [x] The route tree contains usable Dashboard, Jobs, Reports, Voice Logs, and Account surfaces.
+- [x] Jobs, time entries, safety reports, voice logs, and settings survive restart in SQLite.
+- [x] Clocking uses the actual local date and produces a reviewable time entry.
+- [x] Voice capture requests permission, records real audio, handles denial/interruption, and retains or deletes audio deliberately.
+- [x] Every recording enters a review step; no safety or time record is created without user confirmation.
+- [x] Transcription is replaceable, timeout-aware, and functional with a configured endpoint; manual entry remains available offline.
+- [x] Structured extraction is deterministic and confidence-bearing, with user-editable category and target job.
+- [x] Errors, empty states, accessibility labels, and destructive confirmations are present on consequential workflows.
+- [x] CI, EAS profiles, environment examples, privacy/retention documentation, architecture notes, and release instructions exist.
+- [x] No credentials, provider secrets, live-trading behavior, or hidden production mutations are introduced. Live trading is non-applicable to VoiceForge.
 
 ## File map
 
@@ -116,12 +116,21 @@
 
 ## Milestone 8: Documentation and completion audit
 
-- [ ] Replace the generic README with VoiceForge scope, setup, scripts, architecture, platform limitations, and troubleshooting.
-- [ ] Add `docs/ARCHITECTURE.md`, `docs/PRIVACY.md`, `docs/TESTING.md`, `docs/RELEASE.md`, and `docs/PRODUCT.md`.
-- [ ] Record which features are single-user/local-first and what a future authenticated synchronization service must guarantee.
-- [ ] Run a clean temporary-checkout install with the frozen lockfile and full verification gate.
-- [ ] Inspect every acceptance criterion above against source, tests, generated config, and build output; mark only evidenced items complete.
-- [ ] Commit as `docs: document production-ready local-first mvp`.
+- [x] Replace the generic README with VoiceForge scope, setup, scripts, architecture, platform limitations, and troubleshooting.
+- [x] Add `docs/ARCHITECTURE.md`, `docs/PRIVACY.md`, `docs/TESTING.md`, `docs/RELEASE.md`, and `docs/PRODUCT.md`.
+- [x] Record which features are single-user/local-first and what a future authenticated synchronization service must guarantee.
+- [x] Run a clean temporary-checkout install with the frozen lockfile and full verification gate.
+- [x] Inspect every acceptance criterion above against source, tests, generated config, and build output; mark only evidenced items complete.
+- [x] Commit as `docs: document production-ready local-first mvp`.
+
+## Completion evidence
+
+- Clean clone `/tmp/voiceforge-final-audit.fDLyZc`: frozen install succeeded without lockfile changes.
+- Clean clone: 10 test files and 39 tests passed; TypeScript and ESLint exited successfully.
+- Clean clone: cold single-worker Expo web export produced `dist/`; Expo Doctor passed 18/18 checks.
+- Repository tests execute the production migration SQL and cover one-time seeding, foreign keys, persistence hydration, explicit confirmation, atomic clock-out, atomic audited updates, deletions, retention metadata, audit export, and clear-local-data behavior.
+- Generated Expo configuration contains iOS microphone disclosure, Android record-audio permission, disabled background recording, and valid asset/plugin paths.
+- Native store submission, device-specific microphone QA, developer-account ownership, and a deployed transcription endpoint remain external release operations documented in `docs/TESTING.md` and `docs/RELEASE.md`; none is falsely represented as completed repository work.
 
 ## Known external boundary
 
