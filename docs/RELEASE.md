@@ -2,7 +2,7 @@
 
 ## Profiles
 
-`eas.json` defines development, internal preview, and production profiles. Production uses remote app-version management and auto-increment. No production credential is stored in the repository.
+`apps/mobile/eas.json` defines development, internal preview, and production profiles. Production uses remote app-version management and auto-increment. No production credential is stored in the repository.
 
 ## Preflight
 

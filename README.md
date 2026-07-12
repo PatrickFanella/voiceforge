@@ -2,7 +2,7 @@
 
 VoiceForge is an offline-first Expo application for tradespeople to capture field notes, review transcripts, and deliberately turn them into job, time, and safety records. Consequential records are never created from speech without explicit user confirmation.
 
-This repository implements a production-ready **local-first MVP**. It does not include organizational accounts, supervisor approval, cloud synchronization, or a hosted transcription service.
+This repository is being expanded from a production-ready **local-first MVP** into the VoiceForge production platform. The mobile application remains offline-first while backend, worker, and supervisor-console applications are added as independently deployable services.
 
 ## Current capabilities
 
@@ -29,7 +29,7 @@ This repository implements a production-ready **local-first MVP**. It does not i
 
 ```bash
 bun install --frozen-lockfile
-cp .env.example .env.local
+cp .env.example apps/mobile/.env.local
 bun run start
 ```
 
@@ -43,19 +43,21 @@ bun run start-web      # web development server
 bun run typecheck      # strict TypeScript check
 bun run lint           # Expo ESLint configuration
 bun run test           # deterministic unit/repository/component tests
-bun run export:web     # production web export to dist/
+bun run export:web     # production web export to apps/mobile/dist/
 bun run verify         # typecheck + lint + test + web export
 bunx expo-doctor       # Expo/native dependency diagnostics
 ```
 
 ## Architecture
 
-- `app/` contains Expo Router screens and route composition.
-- `domain/` contains platform-independent time and confirmation rules.
-- `features/voice/` contains recording, retention, transcription, and intent extraction.
-- `db/` contains the SQLite migration and repository boundary.
-- `providers/AppProvider.tsx` is the application facade consumed by screens.
-- `tests/` covers pure rules, repository transactions, migrations, and shared component state.
+- `apps/mobile/app/` contains Expo Router screens and route composition.
+- `apps/mobile/domain/` contains platform-independent time and confirmation rules.
+- `apps/mobile/features/voice/` contains recording, retention, transcription, and intent extraction.
+- `apps/mobile/db/` contains the SQLite migration and repository boundary.
+- `apps/mobile/providers/AppProvider.tsx` is the application facade consumed by screens.
+- `apps/mobile/tests/` covers pure rules, repository transactions, migrations, and shared component state.
+- `apps/api/`, `apps/worker/`, and `apps/admin/` are reserved for production services.
+- `packages/` contains code shared across applications.
 
 See [Architecture](docs/ARCHITECTURE.md), [Product scope](docs/PRODUCT.md), [Testing](docs/TESTING.md), [Privacy](docs/PRIVACY.md), and [Release](docs/RELEASE.md).
 
@@ -77,7 +79,7 @@ The mobile app intentionally contains no provider credential. Authentication and
 
 ## Important limitations
 
-- Single-user and local-first; there is no authenticated synchronization service.
+- The current executable product remains single-user and local-first while the authenticated synchronization service is implemented.
 - Web audio uses a browser session blob and does not have the same durable-file semantics as native storage.
 - The app assists record creation but is not a payroll authority, safety authority, or emergency reporting system.
 - EAS identifiers remain `app.rork.voiceforge`; ownership and store enrollment must be configured before submission.
