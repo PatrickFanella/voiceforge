@@ -1,0 +1,29 @@
+# Production backend
+
+VoiceForge is being implemented as a contract-first TypeScript platform. Node.js 22 runs deployable services; Bun installs and orchestrates the workspace.
+
+## Implemented foundation
+
+- Fastify `/v1` API with generated OpenAPI, request IDs, a stable public error envelope, health checks, and graceful shutdown
+- TypeBox contracts shared independently of HTTP handlers
+- Drizzle/PostgreSQL schema and migration for users, identities, devices, personal/team workspaces, memberships, invitations, jobs, workspace change feeds, tombstones, idempotency records, and hash-chained audit events
+- Tenant-oriented indexes and foreign keys, including workspace-scoped change and audit sequences
+- Docker Compose dependencies for PostgreSQL, Redis, S3-compatible MinIO, and Mailpit
+
+The schema is intentionally expanded milestone by milestone. Workflow tables for voice, time approval, safety triage, billing, notifications, exports, webhooks, retention, and legal holds are added with their corresponding domain behavior rather than as unused placeholders.
+
+## Local development
+
+```bash
+cp .env.example .env
+bun install --frozen-lockfile
+bun run dev:dependencies
+bun run db:migrate
+bun run --cwd apps/api dev
+```
+
+The API listens on port 3000 by default. OpenAPI UI is at `/documentation`; the machine-readable committed contract is `apps/api/openapi.json`.
+
+## Migration policy
+
+Production changes follow expand, migrate, contract sequencing. Generated SQL is reviewed and committed. Deployments run migration preflight separately from application startup; containers never mutate the schema implicitly. Destructive contract migrations require evidence that all running application versions have stopped using the old shape.

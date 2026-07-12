@@ -46,6 +46,8 @@ bun run test           # deterministic unit/repository/component tests
 bun run export:web     # production web export to apps/mobile/dist/
 bun run verify         # typecheck + lint + test + web export
 bunx expo-doctor       # Expo/native dependency diagnostics
+bun run dev:dependencies # start PostgreSQL, Redis, MinIO, and Mailpit
+bun run db:migrate     # apply committed PostgreSQL migrations
 ```
 
 ## Architecture
@@ -58,8 +60,9 @@ bunx expo-doctor       # Expo/native dependency diagnostics
 - `apps/mobile/tests/` covers pure rules, repository transactions, migrations, and shared component state.
 - `apps/api/`, `apps/worker/`, and `apps/admin/` are reserved for production services.
 - `packages/` contains code shared across applications.
+- `infra/compose.yaml` runs local PostgreSQL, Redis, MinIO, and Mailpit dependencies.
 
-See [Architecture](docs/ARCHITECTURE.md), [Product scope](docs/PRODUCT.md), [Testing](docs/TESTING.md), [Privacy](docs/PRIVACY.md), and [Release](docs/RELEASE.md).
+See [Architecture](docs/ARCHITECTURE.md), [Backend](docs/BACKEND.md), [Product scope](docs/PRODUCT.md), [Testing](docs/TESTING.md), [Privacy](docs/PRIVACY.md), and [Release](docs/RELEASE.md).
 
 ## Data and transcription
 

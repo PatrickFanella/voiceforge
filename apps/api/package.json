@@ -1,0 +1,29 @@
+{
+  "name": "@voiceforge/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22 <23" },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "openapi:generate": "tsx scripts/generate-openapi.ts",
+    "verify": "bun run typecheck && bun run test && bun run build && bun run openapi:generate && git diff --exit-code -- openapi.json"
+  },
+  "dependencies": {
+    "@fastify/swagger": "^9.5.1",
+    "@fastify/swagger-ui": "^5.2.3",
+    "@fastify/type-provider-typebox": "^5.2.0",
+    "@voiceforge/contracts": "workspace:*",
+    "fastify": "^5.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

@@ -13,7 +13,13 @@
     "test": "bun run --cwd apps/mobile test",
     "test:watch": "bun run --cwd apps/mobile test:watch",
     "export:web": "bun run --cwd apps/mobile export:web",
-    "verify": "bun run --cwd apps/mobile verify",
-    "doctor": "bun run --cwd apps/mobile doctor"
+    "verify": "bun run verify:backend && bun run verify:mobile",
+    "verify:backend": "bun run --cwd packages/contracts verify && bun run --cwd packages/database verify && bun run --cwd apps/api verify",
+    "verify:mobile": "bun run --cwd apps/mobile verify",
+    "doctor": "bun run --cwd apps/mobile doctor",
+    "dev:dependencies": "docker compose -f infra/compose.yaml up -d",
+    "dev:dependencies:down": "docker compose -f infra/compose.yaml down",
+    "db:generate": "bun run --cwd packages/database generate",
+    "db:migrate": "bun run --cwd packages/database migrate"
   }
 }
