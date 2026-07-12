@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import type { VoiceForgeDatabase } from './client.js';
 import { identities, invitations, users, workspaceMemberships, workspaces } from './schema.js';
@@ -129,7 +130,53 @@ export class TenancyRepository {
       return access;
     });
   }
+
+  async listMembers(workspaceId: string) {
+    return this.db.select({
+      userId: workspaceMemberships.userId, role: workspaceMemberships.role, status: workspaceMemberships.status,
+      displayName: users.displayName, email: users.primaryEmail, joinedAt: workspaceMemberships.joinedAt,
+    }).from(workspaceMemberships).innerJoin(users, eq(workspaceMemberships.userId, users.id))
+      .where(eq(workspaceMemberships.workspaceId, workspaceId)).orderBy(users.displayName, users.primaryEmail);
+  }
+
+  async listInvitations(workspaceId: string) {
+    return this.db.select({
+      id: invitations.id, email: invitations.email, role: invitations.role, status: invitations.status,
+      invitedBy: invitations.invitedBy, expiresAt: invitations.expiresAt, createdAt: invitations.createdAt,
+    }).from(invitations).where(eq(invitations.workspaceId, workspaceId)).orderBy(invitations.createdAt);
+  }
+
+  async updateMemberRole(input: { workspaceId: string; userId: string; role: WorkspaceAccess['role'] }) {
+    return this.db.transaction(async (tx) => {
+      const [member] = await tx.select().from(workspaceMemberships).where(and(
+        eq(workspaceMemberships.workspaceId, input.workspaceId), eq(workspaceMemberships.userId, input.userId),
+      )).limit(1).for('update');
+      if (!member) throw new Error('Membership not found.');
+      if (member.role === 'owner' && input.role !== 'owner') await ensureAnotherOwner(tx, input.workspaceId, input.userId);
+      const [updated] = await tx.update(workspaceMemberships).set({ role: input.role, updatedAt: new Date() })
+        .where(and(eq(workspaceMemberships.workspaceId, input.workspaceId), eq(workspaceMemberships.userId, input.userId)))
+        .returning();
+      return updated!;
+    });
+  }
+
+  async removeMember(input: { workspaceId: string; userId: string }) {
+    await this.db.transaction(async (tx) => {
+      const [member] = await tx.select().from(workspaceMemberships).where(and(
+        eq(workspaceMemberships.workspaceId, input.workspaceId), eq(workspaceMemberships.userId, input.userId),
+      )).limit(1).for('update');
+      if (!member) throw new Error('Membership not found.');
+      if (member.role === 'owner') await ensureAnotherOwner(tx, input.workspaceId, input.userId);
+      await tx.update(workspaceMemberships).set({ status: 'removed', updatedAt: new Date() })
+        .where(and(eq(workspaceMemberships.workspaceId, input.workspaceId), eq(workspaceMemberships.userId, input.userId)));
+    });
+  }
 }
 
 export class InvitationAcceptanceError extends Error {}
-import { createHash } from 'node:crypto';
+
+type Transaction = Parameters<Parameters<VoiceForgeDatabase['transaction']>[0]>[0];
+async function ensureAnotherOwner(tx: Transaction, workspaceId: string, excludingUserId: string) {
+  const rows = await tx.execute(sql`select count(*)::int as count from workspace_memberships where workspace_id = ${workspaceId} and role = 'owner' and status = 'active' and user_id <> ${excludingUserId}`);
+  if (Number(rows[0]?.count ?? 0) < 1) throw new Error('A workspace must retain at least one owner.');
+}

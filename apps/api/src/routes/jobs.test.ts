@@ -21,8 +21,10 @@ function dependencies(role: WorkspaceAccess['role'] = 'owner') {
       bootstrapIdentity: vi.fn(async () => ({ user: { id: userId, displayName: null, primaryEmail: 'owner@example.com' }, personalWorkspaceId: workspaceId, workspaces: [access] })),
       getAccess: vi.fn(async (_userId: string, id: string) => id === workspaceId ? access : null),
       createTeam: vi.fn(), createInvitation: vi.fn(), acceptInvitation: vi.fn(),
+      listMembers: vi.fn(async () => []), listInvitations: vi.fn(async () => []), updateMemberRole: vi.fn(), removeMember: vi.fn(),
     },
     jobs: {
+      listMembers: vi.fn(async () => []), assignMember: vi.fn(async () => ({ workspaceId, jobId, userId, assignedBy: userId, createdAt: new Date(), updatedAt: new Date() })), removeMember: vi.fn(async () => undefined),
       list: vi.fn(async () => [record]), create: vi.fn(async () => record), update: vi.fn(async () => ({ ...record, version: 2 })),
       delete: vi.fn(async () => ({ id: jobId, version: 2 })),
     },
@@ -55,6 +57,20 @@ describe('job routes', () => {
     expect(foreign.statusCode).toBe(403);
     expect(deps.jobs.create).not.toHaveBeenCalled();
     expect(deps.jobs.list).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('manages job crews only through authorized team membership', async () => {
+    const deps = dependencies('supervisor');
+    const app = await buildApp(deps);
+    const assigned = await app.inject({ method: 'PUT', url: `/v1/workspaces/${workspaceId}/jobs/${jobId}/members/${userId}`, headers });
+    const listed = await app.inject({ method: 'GET', url: `/v1/workspaces/${workspaceId}/jobs/${jobId}/members`, headers });
+    const removed = await app.inject({ method: 'DELETE', url: `/v1/workspaces/${workspaceId}/jobs/${jobId}/members/${userId}`, headers });
+    expect(assigned.statusCode).toBe(200);
+    expect(listed.statusCode).toBe(200);
+    expect(removed.statusCode).toBe(204);
+    expect(deps.jobs.assignMember).toHaveBeenCalledWith(expect.objectContaining({ workspaceId, jobId, userId, actorUserId: userId }));
+    expect(deps.jobs.removeMember).toHaveBeenCalledWith({ workspaceId, jobId, userId });
     await app.close();
   });
 });

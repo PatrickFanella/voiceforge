@@ -139,6 +139,14 @@ export const jobs = pgTable('jobs', {
   ...syncMetadata(),
 }, (table) => [index('jobs_workspace_updated_idx').on(table.workspaceId, table.updatedAt)]);
 
+export const jobMembers = pgTable('job_members', {
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  jobId: uuid('job_id').notNull().references(() => jobs.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  assignedBy: uuid('assigned_by').notNull().references(() => users.id),
+  ...timestamps(),
+}, (table) => [primaryKey({ columns: [table.jobId, table.userId] }), index('job_members_workspace_idx').on(table.workspaceId, table.userId)]);
+
 export const audioObjects = pgTable('audio_objects', {
   id: uuid('id').primaryKey(),
   workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),

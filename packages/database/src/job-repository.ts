@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { VoiceForgeDatabase } from './client.js';
-import { auditEvents, entityTombstones, idempotencyKeys, jobs, workspaceChanges, workspaces } from './schema.js';
+import { auditEvents, entityTombstones, idempotencyKeys, jobMembers, jobs, users, workspaceChanges, workspaceMemberships, workspaces } from './schema.js';
 
 type Transaction = Parameters<Parameters<VoiceForgeDatabase['transaction']>[0]>[0];
 export interface JobRecord {
@@ -34,6 +34,30 @@ export class JobRepository {
     return this.db.select(jobSelection).from(jobs)
       .where(and(eq(jobs.workspaceId, workspaceId), isNull(jobs.deletedAt)))
       .orderBy(desc(jobs.updatedAt));
+  }
+
+  async listMembers(workspaceId: string, jobId: string) {
+    return this.db.select({ userId: jobMembers.userId, displayName: users.displayName, email: users.primaryEmail, assignedAt: jobMembers.createdAt })
+      .from(jobMembers).innerJoin(users, eq(users.id, jobMembers.userId))
+      .where(and(eq(jobMembers.workspaceId, workspaceId), eq(jobMembers.jobId, jobId)))
+      .orderBy(users.displayName, users.primaryEmail);
+  }
+
+  async assignMember(input: { workspaceId: string; jobId: string; userId: string; actorUserId: string }) {
+    return this.db.transaction(async (tx) => {
+      const [job] = await tx.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.id, input.jobId), eq(jobs.workspaceId, input.workspaceId), isNull(jobs.deletedAt))).limit(1);
+      const [membership] = await tx.select({ userId: workspaceMemberships.userId }).from(workspaceMemberships).where(and(
+        eq(workspaceMemberships.workspaceId, input.workspaceId), eq(workspaceMemberships.userId, input.userId), eq(workspaceMemberships.status, 'active'),
+      )).limit(1);
+      if (!job || !membership) throw new EntityNotFoundError('Job or active workspace member not found.');
+      const [assigned] = await tx.insert(jobMembers).values({ workspaceId: input.workspaceId, jobId: input.jobId, userId: input.userId, assignedBy: input.actorUserId })
+        .onConflictDoUpdate({ target: [jobMembers.jobId, jobMembers.userId], set: { assignedBy: input.actorUserId, updatedAt: new Date() } }).returning();
+      return assigned!;
+    });
+  }
+
+  async removeMember(input: { workspaceId: string; jobId: string; userId: string }) {
+    await this.db.delete(jobMembers).where(and(eq(jobMembers.workspaceId, input.workspaceId), eq(jobMembers.jobId, input.jobId), eq(jobMembers.userId, input.userId)));
   }
 
   async create(input: {

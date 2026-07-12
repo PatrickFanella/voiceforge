@@ -40,6 +40,11 @@ export const InvitationResponse = Type.Object({
 });
 
 export const AcceptInvitationBody = Type.Object({ token: Type.String({ minLength: 32, maxLength: 255 }) });
+export const UpdateMemberRoleBody = Type.Object({ workspaceId: Uuid, role: WorkspaceRole });
+export const WorkspaceMember = Type.Object({
+  userId: Uuid, role: WorkspaceRole, status: Type.String(), displayName: Type.Union([Type.String(), Type.Null()]),
+  email: Type.Union([Type.String(), Type.Null()]), joinedAt: Type.Union([UtcDateTime, Type.Null()]),
+});
 
 export type WorkspaceSummary = Static<typeof WorkspaceSummary>;
 export type BootstrapResponse = Static<typeof BootstrapResponse>;
@@ -47,3 +52,4 @@ export type CreateWorkspaceBody = Static<typeof CreateWorkspaceBody>;
 export type CreateInvitationBody = Static<typeof CreateInvitationBody>;
 export type InvitationResponse = Static<typeof InvitationResponse>;
 export type AcceptInvitationBody = Static<typeof AcceptInvitationBody>;
+export type UpdateMemberRoleBody = Static<typeof UpdateMemberRoleBody>;

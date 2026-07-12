@@ -4,7 +4,7 @@ import type { JobRepository, TenancyRepository } from '@voiceforge/database';
 import type { FastifyInstance } from 'fastify';
 import { identityFor, type TenancyStore } from './tenancy.js';
 
-type JobStore = Pick<JobRepository, 'list' | 'create' | 'update' | 'delete'>;
+type JobStore = Pick<JobRepository, 'list' | 'create' | 'update' | 'delete' | 'listMembers' | 'assignMember' | 'removeMember'>;
 
 export async function registerJobRoutes(app: FastifyInstance, dependencies: {
   verifier: TokenVerifier;
@@ -71,10 +71,36 @@ export async function registerJobRoutes(app: FastifyInstance, dependencies: {
       id: request.params.jobId, baseVersion: request.body.baseVersion,
     });
   });
+
+  app.get<{ Params: { workspaceId: string; jobId: string } }>('/v1/workspaces/:workspaceId/jobs/:jobId/members', {
+    schema: { operationId: 'listJobMembers', tags: ['jobs'], params: jobParams },
+  }, async (request) => {
+    const { access } = await accessFor(request, request.params.workspaceId);
+    requirePermission(access.role, 'job:manage', access.kind);
+    return { data: await dependencies.jobs.listMembers(access.id, request.params.jobId), nextCursor: null };
+  });
+
+  app.put<{ Headers: { 'idempotency-key': string }; Params: { workspaceId: string; jobId: string; userId: string } }>('/v1/workspaces/:workspaceId/jobs/:jobId/members/:userId', {
+    schema: { operationId: 'assignJobMember', tags: ['jobs'], headers: IdempotencyKeyHeader, params: jobMemberParams },
+  }, async (request) => {
+    const { session, access } = await accessFor(request, request.params.workspaceId);
+    requirePermission(access.role, 'job:manage', access.kind);
+    return dependencies.jobs.assignMember({ workspaceId: access.id, jobId: request.params.jobId, userId: request.params.userId, actorUserId: session.user.id });
+  });
+
+  app.delete<{ Headers: { 'idempotency-key': string }; Params: { workspaceId: string; jobId: string; userId: string } }>('/v1/workspaces/:workspaceId/jobs/:jobId/members/:userId', {
+    schema: { operationId: 'removeJobMember', tags: ['jobs'], headers: IdempotencyKeyHeader, params: jobMemberParams },
+  }, async (request, reply) => {
+    const { access } = await accessFor(request, request.params.workspaceId);
+    requirePermission(access.role, 'job:manage', access.kind);
+    await dependencies.jobs.removeMember({ workspaceId: access.id, jobId: request.params.jobId, userId: request.params.userId });
+    return reply.code(204).send();
+  });
 }
 
 const workspaceParams = { type: 'object', required: ['workspaceId'], properties: { workspaceId: { type: 'string', format: 'uuid' } } } as const;
 const jobParams = { type: 'object', required: ['workspaceId', 'jobId'], properties: { workspaceId: { type: 'string', format: 'uuid' }, jobId: { type: 'string', format: 'uuid' } } } as const;
+const jobMemberParams = { type: 'object', required: ['workspaceId', 'jobId', 'userId'], properties: { workspaceId: { type: 'string', format: 'uuid' }, jobId: { type: 'string', format: 'uuid' }, userId: { type: 'string', format: 'uuid' } } } as const;
 const serializeJob = (record: Awaited<ReturnType<JobStore['create']>>): JobOutput => ({
   ...record, createdAt: record.createdAt.toISOString(), updatedAt: record.updatedAt.toISOString(),
 });

@@ -10,8 +10,9 @@ const app = await buildApp({
     getAccess: unavailable,
     createInvitation: unavailable,
     acceptInvitation: unavailable,
+    listMembers: unavailable, listInvitations: unavailable, updateMemberRole: unavailable, removeMember: unavailable,
   },
-  jobs: { list: unavailable, create: unavailable, update: unavailable, delete: unavailable },
+  jobs: { list: unavailable, create: unavailable, update: unavailable, delete: unavailable, listMembers: unavailable, assignMember: unavailable, removeMember: unavailable },
   sync: { pull: unavailable },
   cursorSecret: 'contract-generation-only',
   transcription: {

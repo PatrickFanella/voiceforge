@@ -21,8 +21,8 @@ import { registerSafetyRoutes, type SafetyQueue } from './routes/safety.js';
 
 export interface AppDependencies {
   verifier: TokenVerifier;
-  tenancy: Pick<TenancyRepository, 'bootstrapIdentity' | 'createTeam' | 'getAccess' | 'createInvitation' | 'acceptInvitation'>;
-  jobs?: Pick<JobRepository, 'list' | 'create' | 'update' | 'delete'>;
+  tenancy: Pick<TenancyRepository, 'bootstrapIdentity' | 'createTeam' | 'getAccess' | 'createInvitation' | 'acceptInvitation' | 'listMembers' | 'listInvitations' | 'updateMemberRole' | 'removeMember'>;
+  jobs?: Pick<JobRepository, 'list' | 'create' | 'update' | 'delete' | 'listMembers' | 'assignMember' | 'removeMember'>;
   sync?: Pick<SyncRepository, 'pull'>;
   cursorSecret?: string;
   transcription?: {

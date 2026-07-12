@@ -22,8 +22,10 @@ function dependencies() {
     tenancy: {
       bootstrapIdentity: vi.fn(async () => ({ user: { id: userId, displayName: null, primaryEmail: 'owner@example.com' }, personalWorkspaceId: workspaceId, workspaces: [access] })),
       getAccess: vi.fn(async () => access), createTeam: vi.fn(), createInvitation: vi.fn(), acceptInvitation: vi.fn(),
+      listMembers: vi.fn(async () => []), listInvitations: vi.fn(async () => []), updateMemberRole: vi.fn(), removeMember: vi.fn(),
     },
     jobs: {
+      listMembers: vi.fn(async () => []), assignMember: vi.fn(async () => ({ workspaceId, jobId: timeRecord.jobId, userId, assignedBy: userId, createdAt: new Date(), updatedAt: new Date() })), removeMember: vi.fn(async () => undefined),
       list: vi.fn(async () => []), create: vi.fn(),
       update: vi.fn(async () => { throw new VersionConflictError('stale'); }), delete: vi.fn(),
     },

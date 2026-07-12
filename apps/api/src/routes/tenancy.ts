@@ -6,6 +6,8 @@ import {
   CreateWorkspaceBody,
   IdempotencyKeyHeader,
   InvitationResponse,
+  UpdateMemberRoleBody,
+  WorkspaceMember,
   WorkspaceSummary,
   type CreateInvitationBody as CreateInvitationInput,
   type AcceptInvitationBody as AcceptInvitationInput,
@@ -13,11 +15,12 @@ import {
   type BootstrapResponse as BootstrapOutput,
   type InvitationResponse as InvitationOutput,
   type WorkspaceSummary as WorkspaceOutput,
+  type UpdateMemberRoleBody as UpdateMemberRoleInput,
 } from '@voiceforge/contracts';
 import type { BootstrapResult, TenancyRepository, WorkspaceAccess } from '@voiceforge/database';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
-export type TenancyStore = Pick<TenancyRepository, 'bootstrapIdentity' | 'createTeam' | 'getAccess' | 'createInvitation' | 'acceptInvitation'>;
+export type TenancyStore = Pick<TenancyRepository, 'bootstrapIdentity' | 'createTeam' | 'getAccess' | 'createInvitation' | 'acceptInvitation' | 'listMembers' | 'listInvitations' | 'updateMemberRole' | 'removeMember'>;
 
 export async function identityFor(request: FastifyRequest, verifier: TokenVerifier, store: TenancyStore) {
   const authorization = request.headers.authorization;
@@ -73,4 +76,52 @@ export async function registerTenancyRoutes(app: FastifyInstance, dependencies: 
     if (!identity.email || !identity.emailVerified) throw new AuthenticationError('A verified email is required.');
     return dependencies.store.acceptInvitation({ token: request.body.token, userId: session.user.id, email: identity.email });
   });
+
+  app.get<{ Params: { workspaceId: string } }>('/v1/workspaces/:workspaceId/memberships', {
+    schema: { operationId: 'listWorkspaceMembers', tags: ['memberships'], params: workspaceIdParams },
+  }, async (request) => {
+    const { session } = await identityFor(request, dependencies.verifier, dependencies.store);
+    const access = await dependencies.store.getAccess(session.user.id, request.params.workspaceId);
+    if (!access) throw new AuthorizationError('membership:manage');
+    return { data: await dependencies.store.listMembers(access.id), nextCursor: null };
+  });
+
+  app.get<{ Params: { workspaceId: string } }>('/v1/workspaces/:workspaceId/invitations', {
+    schema: { operationId: 'listWorkspaceInvitations', tags: ['memberships'], params: workspaceIdParams },
+  }, async (request) => {
+    const { session } = await identityFor(request, dependencies.verifier, dependencies.store);
+    const access = await dependencies.store.getAccess(session.user.id, request.params.workspaceId);
+    if (!access) throw new AuthorizationError('membership:manage');
+    requirePermission(access.role, 'membership:manage', access.kind);
+    return { data: await dependencies.store.listInvitations(access.id), nextCursor: null };
+  });
+
+  app.patch<{ Headers: { 'idempotency-key': string }; Params: { workspaceId: string; userId: string }; Body: UpdateMemberRoleInput }>('/v1/workspaces/:workspaceId/memberships/:userId', {
+    schema: { operationId: 'updateWorkspaceMemberRole', tags: ['memberships'], headers: IdempotencyKeyHeader, params: memberParams, body: UpdateMemberRoleBody },
+  }, async (request) => {
+    const { session } = await identityFor(request, dependencies.verifier, dependencies.store);
+    const access = await dependencies.store.getAccess(session.user.id, request.params.workspaceId);
+    if (!access || access.id !== request.body.workspaceId) throw new AuthorizationError('membership:manage');
+    requirePermission(access.role, 'membership:manage', access.kind);
+    const target = (await dependencies.store.listMembers(access.id)).find((member) => member.userId === request.params.userId);
+    if (!target) throw new AuthorizationError('membership:manage');
+    if (access.role === 'admin' && (target.role === 'owner' || target.role === 'admin' || request.body.role === 'owner' || request.body.role === 'admin')) throw new AuthorizationError('membership:manage');
+    return dependencies.store.updateMemberRole({ workspaceId: access.id, userId: request.params.userId, role: request.body.role });
+  });
+
+  app.delete<{ Headers: { 'idempotency-key': string }; Params: { workspaceId: string; userId: string } }>('/v1/workspaces/:workspaceId/memberships/:userId', {
+    schema: { operationId: 'removeWorkspaceMember', tags: ['memberships'], headers: IdempotencyKeyHeader, params: memberParams },
+  }, async (request, reply) => {
+    const { session } = await identityFor(request, dependencies.verifier, dependencies.store);
+    const access = await dependencies.store.getAccess(session.user.id, request.params.workspaceId);
+    if (!access) throw new AuthorizationError('membership:manage');
+    requirePermission(access.role, 'membership:manage', access.kind);
+    const target = (await dependencies.store.listMembers(access.id)).find((member) => member.userId === request.params.userId);
+    if (!target || (access.role === 'admin' && (target.role === 'owner' || target.role === 'admin'))) throw new AuthorizationError('membership:manage');
+    await dependencies.store.removeMember({ workspaceId: access.id, userId: request.params.userId });
+    return reply.code(204).send();
+  });
 }
+
+const workspaceIdParams = { type: 'object', required: ['workspaceId'], properties: { workspaceId: { type: 'string', format: 'uuid' } } } as const;
+const memberParams = { type: 'object', required: ['workspaceId', 'userId'], properties: { workspaceId: { type: 'string', format: 'uuid' }, userId: { type: 'string', format: 'uuid' } } } as const;

@@ -1,6 +1,6 @@
 import type { TokenVerifier } from '@voiceforge/auth';
 import type { BootstrapResult, WorkspaceAccess } from '@voiceforge/database';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../app.js';
 import type { TenancyStore } from './tenancy.js';
 
@@ -36,6 +36,9 @@ function fixture(role: WorkspaceAccess['role'] = 'owner') {
       return invitation;
     },
     acceptInvitation: async () => team,
+    listMembers: async () => [], listInvitations: async () => [],
+    updateMemberRole: async () => ({ workspaceId: teamId, userId, role: 'worker' as const, status: 'active' as const, joinedAt: null, createdAt: new Date(), updatedAt: new Date() }),
+    removeMember: async () => undefined,
   };
   return { store, invitations };
 }
@@ -114,6 +117,19 @@ describe('identity and tenancy routes', () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ id: teamId, kind: 'team', role: 'worker' });
+    await app.close();
+  });
+
+  it('lists and updates members for team administrators', async () => {
+    const { store } = fixture('admin');
+    store.listMembers = vi.fn(async () => [{ userId, role: 'worker' as const, status: 'active' as const, displayName: null, email: 'worker@example.com', joinedAt: new Date() }]);
+    store.updateMemberRole = vi.fn(async () => ({ workspaceId: teamId, userId, role: 'worker' as const, status: 'active' as const, joinedAt: null, createdAt: new Date(), updatedAt: new Date() }));
+    const app = await buildApp({ verifier, tenancy: store });
+    const listed = await app.inject({ method: 'GET', url: `/v1/workspaces/${teamId}/memberships`, headers: authHeaders });
+    const updated = await app.inject({ method: 'PATCH', url: `/v1/workspaces/${teamId}/memberships/${userId}`, headers: authHeaders, payload: { workspaceId: teamId, role: 'worker' } });
+    expect(listed.statusCode).toBe(200);
+    expect(updated.statusCode).toBe(200);
+    expect(store.updateMemberRole).toHaveBeenCalledWith({ workspaceId: teamId, userId, role: 'worker' });
     await app.close();
   });
 });

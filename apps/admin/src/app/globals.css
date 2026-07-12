@@ -1,0 +1,43 @@
+:root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #0b0f14; color: #edf4f1; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 75% 5%, #17342c 0, #0b0f14 35%); }
+button, input, select, textarea { font: inherit; }
+button, .primary { border: 0; border-radius: .55rem; background: #b9ff66; color: #10170c; padding: .65rem .9rem; font-weight: 750; cursor: pointer; }
+button.secondary { background: #27312e; color: #d9e4df; }
+.shell { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100vh; }
+aside { border-right: 1px solid #26302d; background: #0c1212e8; padding: 1.5rem 1rem; display: flex; flex-direction: column; }
+.brand { display: flex; gap: .8rem; align-items: center; margin: 0 .5rem 2rem; }
+.brand > span { background: #b9ff66; color: #10170c; border-radius: .65rem; padding: .7rem; font-weight: 900; }
+.brand small, td small { color: #93a39d; display: block; margin-top: .2rem; }
+nav { display: grid; gap: .25rem; }
+nav button { text-align: left; background: transparent; color: #9caaa5; }
+nav button:hover, nav button.active { background: #1b2824; color: #dfffba; }
+.signout { margin-top: auto; color: #9caaa5; padding: .75rem; }
+.main { padding: 2rem clamp(1rem, 4vw, 3.5rem); overflow: hidden; }
+header { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 2rem; }
+h1, h2, p { margin-top: 0; } h1 { font-size: clamp(2rem, 4vw, 3.2rem); margin-bottom: 0; letter-spacing: -.04em; } h2 { font-size: 1.05rem; }
+.eyebrow { color: #b9ff66; font-size: .72rem; font-weight: 850; letter-spacing: .16em; margin-bottom: .5rem; }
+.header-actions { display: flex; align-items: end; gap: 1rem; }
+label { display: grid; gap: .4rem; color: #a8b6b1; font-size: .8rem; }
+input, select, textarea { color: #edf4f1; background: #151e1b; border: 1px solid #35423e; border-radius: .5rem; padding: .65rem; min-width: 12rem; }
+textarea { min-height: 7rem; resize: vertical; }
+form { display: grid; gap: 1rem; }
+.metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.metric, .panel { border: 1px solid #2b3733; background: #111917e6; border-radius: .8rem; padding: 1.2rem; }
+.metric span { color: #99a8a2; font-size: .8rem; } .metric strong { display: block; font-size: 2rem; margin-top: .5rem; } .metric.danger strong { color: #ff8c76; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.panel { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+th, td { text-align: left; border-bottom: 1px solid #25302d; padding: .8rem .5rem; vertical-align: top; }
+th { color: #8c9b95; font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; }
+.actions { display: flex; gap: .4rem; }
+.status { background: #26332f; border-radius: 999px; display: inline-block; font-size: .68rem; padding: .25rem .5rem; text-transform: capitalize; white-space: nowrap; }
+.status-critical, .status-failed, .status-dead_letter { background: #642e2a; color: #ffd0c8; }
+.status-approved, .status-closed, .status-active { background: #20462f; color: #c3ffd4; }
+.error { background: #4b2926; border: 1px solid #87453e; padding: .8rem; border-radius: .6rem; margin-bottom: 1rem; }
+.muted { color: #9caaa5; }
+.login, .loading { display: grid; place-items: center; min-height: 100vh; padding: 2rem; }
+.login-card { max-width: 560px; border: 1px solid #35423e; background: #111917; padding: 3rem; border-radius: 1rem; }
+.login-card h1 { margin-bottom: 1rem; }.login-card .primary { display: inline-block; margin-top: 1rem; text-decoration: none; }
+@media (max-width: 900px) { .shell { grid-template-columns: 1fr; } aside { position: static; border-right: 0; } nav { display: flex; overflow-x: auto; } .signout { margin-top: 1rem; } .metrics, .grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .metrics, .grid { grid-template-columns: 1fr; } header { align-items: stretch; flex-direction: column; } .header-actions { align-items: stretch; flex-direction: column; } .user { display: none; } }

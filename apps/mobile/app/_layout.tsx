@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AppProvider } from "@/providers/AppProvider";
 import { Colors } from "@/constants/colors";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
+import { BackendAuthProvider } from '@/features/backend/AuthProvider';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -42,6 +43,7 @@ function RootLayoutNav() {
       <Stack.Screen name="time-review" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="record-edit" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="job-edit" options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="team-operations" options={{ title: 'Team operations' }} />
     </Stack>
   );
 }
@@ -55,9 +57,7 @@ export default function RootLayout() {
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <GestureHandlerRootView style={{ flex: 1 }}>
-          <AppProvider>
-            <RootLayoutNav />
-          </AppProvider>
+          <BackendAuthProvider><AppProvider><RootLayoutNav /></AppProvider></BackendAuthProvider>
         </GestureHandlerRootView>
       </QueryClientProvider>
     </AppErrorBoundary>

@@ -1,6 +1,7 @@
 import { Alert, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Database, Download, Shield, Trash2 } from 'lucide-react-native';
+import { Database, Download, Shield, Trash2, Users } from 'lucide-react-native';
+import { router } from 'expo-router';
 
 import { ScreenState } from '@/components/ScreenState';
 import { Colors } from '@/constants/colors';
@@ -44,7 +45,7 @@ export default function AccountScreen() {
         <Database color={Colors.dark.info} size={20} />
         <View style={styles.infoText}>
           <Text style={styles.infoTitle}>Local-first storage</Text>
-          <Text style={styles.infoBody}>Your field records are stored in an on-device SQLite database. VoiceForge currently has no account server or background sync.</Text>
+          <Text style={styles.infoBody}>Field records stay available in on-device SQLite. When signed in, the server synchronizes explicitly selected personal and team workspaces.</Text>
         </View>
       </View>
 
@@ -69,11 +70,14 @@ export default function AccountScreen() {
         <Download color={Colors.dark.accent} size={19} />
         <Text style={styles.actionText}>Export data as JSON</Text>
       </TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open team operations" style={styles.action} onPress={() => router.push('/team-operations')}>
+        <Users color={Colors.dark.accent} size={19} /><Text style={styles.actionText}>Team operations</Text>
+      </TouchableOpacity>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel="Clear all local VoiceForge data" style={[styles.action, styles.dangerAction]} onPress={confirmClear}>
         <Trash2 color={Colors.dark.danger} size={19} />
         <Text style={[styles.actionText, styles.dangerText]}>Clear local data</Text>
       </TouchableOpacity>
-      <Text style={styles.version}>VoiceForge local MVP · schema 2</Text>
+      <Text style={styles.version}>VoiceForge · offline-first schema 2</Text>
     </ScrollView>
   );
 }

@@ -21,6 +21,7 @@ function dependencies(role: WorkspaceAccess['role'] = 'worker') {
     tenancy: {
       bootstrapIdentity: vi.fn(async () => ({ user: { id: userId, displayName: null, primaryEmail: 'worker@example.com' }, personalWorkspaceId: workspaceId, workspaces: [access] })),
       getAccess: vi.fn(async () => access), createTeam: vi.fn(), createInvitation: vi.fn(), acceptInvitation: vi.fn(),
+      listMembers: vi.fn(async () => []), listInvitations: vi.fn(async () => []), updateMemberRole: vi.fn(), removeMember: vi.fn(),
     },
     transcription: {
       repository: {
