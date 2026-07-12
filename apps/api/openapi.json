@@ -1367,6 +1367,525 @@
           }
         }
       }
+    },
+    "/v1/audio-uploads": {
+      "post": {
+        "operationId": "createAudioUpload",
+        "tags": [
+          "transcription"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "contentType",
+                  "bytes"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "contentType": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "audio/m4a"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "audio/mp4"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "audio/mpeg"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "audio/wav"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "audio/webm"
+                        ]
+                      }
+                    ]
+                  },
+                  "bytes": {
+                    "minimum": 1,
+                    "maximum": 104857600,
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "minLength": 16,
+              "maxLength": 255,
+              "type": "string"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "audioObjectId",
+                    "uploadUrl",
+                    "objectKey",
+                    "expiresAt",
+                    "requiredHeaders"
+                  ],
+                  "properties": {
+                    "audioObjectId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "uploadUrl": {
+                      "format": "uri",
+                      "type": "string"
+                    },
+                    "objectKey": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "requiredHeaders": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/transcriptions": {
+      "post": {
+        "operationId": "createTranscription",
+        "tags": [
+          "transcription"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "voiceLogId",
+                  "audioObjectId"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "voiceLogId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "audioObjectId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "jobId": {
+                    "format": "uuid",
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "minLength": 16,
+              "maxLength": 255,
+              "type": "string"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "workspaceId",
+                    "voiceLogId",
+                    "audioObjectId",
+                    "status",
+                    "provider",
+                    "attemptCount",
+                    "errorCode",
+                    "errorMessage",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workspaceId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "voiceLogId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "audioObjectId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "queued"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "processing"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "completed"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "failed"
+                          ]
+                        }
+                      ]
+                    },
+                    "provider": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "attemptCount": {
+                      "type": "integer"
+                    },
+                    "errorCode": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "errorMessage": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/transcriptions/{transcriptionId}": {
+      "get": {
+        "operationId": "getTranscription",
+        "tags": [
+          "transcription"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "query",
+            "name": "workspaceId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "transcriptionId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "workspaceId",
+                    "voiceLogId",
+                    "audioObjectId",
+                    "status",
+                    "provider",
+                    "attemptCount",
+                    "errorCode",
+                    "errorMessage",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "workspaceId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "voiceLogId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "audioObjectId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "queued"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "processing"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "completed"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "enum": [
+                            "failed"
+                          ]
+                        }
+                      ]
+                    },
+                    "provider": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "attemptCount": {
+                      "type": "integer"
+                    },
+                    "errorCode": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "errorMessage": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/voice-logs/{voiceLogId}/transcript": {
+      "patch": {
+        "operationId": "reviewVoiceTranscript",
+        "tags": [
+          "transcription"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "transcript"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "transcript": {
+                    "minLength": 1,
+                    "maxLength": 100000,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "voiceLogId",
+            "required": true
+          },
+          {
+            "schema": {
+              "minLength": 16,
+              "maxLength": 255,
+              "type": "string"
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "transcript",
+                    "transcriptProvider",
+                    "version",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "transcript": {
+                      "type": "string"
+                    },
+                    "transcriptProvider": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "updatedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "servers": [

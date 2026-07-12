@@ -9,6 +9,9 @@ import Fastify from 'fastify';
 import { registerTenancyRoutes } from './routes/tenancy.js';
 import { registerJobRoutes } from './routes/jobs.js';
 import { registerSyncRoutes } from './routes/sync.js';
+import { AudioUploadValidationError, type S3AudioStorage } from './services/audio-storage.js';
+import { registerTranscriptionRoutes, type TranscriptionQueue } from './routes/transcription.js';
+import { TranscriptionInputError, type TranscriptionRepository } from '@voiceforge/database';
 
 export interface AppDependencies {
   verifier: TokenVerifier;
@@ -16,6 +19,11 @@ export interface AppDependencies {
   jobs?: Pick<JobRepository, 'list' | 'create' | 'update' | 'delete'>;
   sync?: Pick<SyncRepository, 'pull'>;
   cursorSecret?: string;
+  transcription?: {
+    repository: Pick<TranscriptionRepository, 'createAudioObject' | 'getAudioObject' | 'createJob' | 'getJob' | 'getWork' | 'reviewTranscript'>;
+    storage: Pick<S3AudioStorage, 'signUpload' | 'requiredUploadHeaders' | 'verifyUpload'>;
+    queue: TranscriptionQueue;
+  };
 }
 
 export async function buildApp(dependencies?: AppDependencies) {
@@ -50,6 +58,9 @@ export async function buildApp(dependencies?: AppDependencies) {
       verifier: dependencies.verifier, tenancy: dependencies.tenancy, jobs: dependencies.jobs,
       sync: dependencies.sync, cursorSecret: dependencies.cursorSecret,
     });
+    if (dependencies.transcription) await registerTranscriptionRoutes(app, {
+      verifier: dependencies.verifier, tenancy: dependencies.tenancy, ...dependencies.transcription,
+    });
   }
 
   app.setNotFoundHandler((request, reply) => reply.code(404).send({
@@ -80,6 +91,12 @@ export async function buildApp(dependencies?: AppDependencies) {
     });
     if (error instanceof InvalidCursorError) return reply.code(400).send({
       error: { code: 'BAD_REQUEST', message: 'The synchronization cursor is invalid.', requestId: request.id, details: {} },
+    });
+    if (error instanceof AudioUploadValidationError) return reply.code(400).send({
+      error: { code: 'BAD_REQUEST', message: error.message, requestId: request.id, details: {} },
+    });
+    if (error instanceof TranscriptionInputError) return reply.code(409).send({
+      error: { code: 'VERSION_CONFLICT', message: 'The audio upload is unavailable or already used.', requestId: request.id, details: {} },
     });
     const candidateStatus = error instanceof Error && 'statusCode' in error
       ? Number(error.statusCode)

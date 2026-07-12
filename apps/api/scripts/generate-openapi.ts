@@ -14,6 +14,10 @@ const app = await buildApp({
   jobs: { list: unavailable, create: unavailable, update: unavailable, delete: unavailable },
   sync: { pull: unavailable },
   cursorSecret: 'contract-generation-only',
+  transcription: {
+    repository: { createAudioObject: unavailable, getAudioObject: unavailable, createJob: unavailable, getJob: unavailable, getWork: unavailable, reviewTranscript: unavailable },
+    storage: { signUpload: unavailable, requiredUploadHeaders: () => ({}), verifyUpload: unavailable }, queue: { enqueue: unavailable },
+  },
 });
 await app.ready();
 await writeFile(new URL('../openapi.json', import.meta.url), `${JSON.stringify(app.swagger(), null, 2)}\n`);

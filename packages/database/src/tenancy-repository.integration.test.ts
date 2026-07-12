@@ -4,6 +4,7 @@ import { createDatabase } from './client.js';
 import { IdempotencyConflictError, JobRepository, VersionConflictError } from './job-repository.js';
 import { TenancyRepository } from './tenancy-repository.js';
 import { SyncRepository } from './sync-repository.js';
+import { TranscriptionRepository } from './transcription-repository.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const suite = databaseUrl ? describe : describe.skip;
@@ -13,6 +14,7 @@ suite('TenancyRepository against PostgreSQL', () => {
   const repository = new TenancyRepository(database.db);
   const jobRepository = new JobRepository(database.db);
   const syncRepository = new SyncRepository(database.db);
+  const transcriptionRepository = new TranscriptionRepository(database.db);
 
   beforeAll(async () => {
     await database.db.execute(sql`truncate table invitations, workspace_memberships, identities, users, workspaces cascade`);
@@ -114,5 +116,42 @@ suite('TenancyRepository against PostgreSQL', () => {
         (select count(*)::int from idempotency_keys where workspace_id = ${actor.personalWorkspaceId} and key = 'job-rollback-000001') as keys
     `);
     expect(residue[0]).toMatchObject({ jobs: 0, changes: 0, keys: 0 });
+  });
+
+  it('persists transcription attempts and completes the voice log without creating consequential records', async () => {
+    const actor = await repository.bootstrapIdentity({ subject: 'auth0|transcriber', email: 'transcriber@example.com' });
+    const audio = await transcriptionRepository.createAudioObject({
+      workspaceId: actor.personalWorkspaceId, actorUserId: actor.user.id, contentType: 'audio/m4a', bytes: 2,
+      idempotencyKey: 'audio-create-000001', expiresAt: new Date(Date.now() + 60_000),
+    });
+    const audioReplay = await transcriptionRepository.createAudioObject({
+      workspaceId: actor.personalWorkspaceId, actorUserId: actor.user.id, contentType: 'audio/m4a', bytes: 2,
+      idempotencyKey: 'audio-create-000001', expiresAt: new Date(Date.now() + 120_000),
+    });
+    expect(audioReplay).toEqual(audio);
+    const voiceLogId = crypto.randomUUID();
+    const job = await transcriptionRepository.createJob({
+      workspaceId: actor.personalWorkspaceId, actorUserId: actor.user.id, voiceLogId, audioObjectId: audio.id,
+      idempotencyKey: 'transcription-create-001',
+    });
+    const jobReplay = await transcriptionRepository.createJob({
+      workspaceId: actor.personalWorkspaceId, actorUserId: actor.user.id, voiceLogId, audioObjectId: audio.id,
+      idempotencyKey: 'transcription-create-001',
+    });
+    expect(jobReplay).toEqual(job);
+    await transcriptionRepository.markProcessing(job.id);
+    await transcriptionRepository.complete({ id: job.id, transcript: 'Two hours on site.', confidence: 0.9, provider: 'test', metadata: { requestId: 'one' } });
+    expect(await transcriptionRepository.getJob(actor.personalWorkspaceId, job.id)).toMatchObject({ status: 'completed', attemptCount: 1, provider: 'test' });
+    await transcriptionRepository.reviewTranscript({
+      workspaceId: actor.personalWorkspaceId, voiceLogId, actorUserId: actor.user.id, transcript: 'Two reviewed hours on site.',
+      idempotencyKey: 'transcript-review-00001',
+    });
+    const evidence = await database.db.execute(sql`
+      select
+        (select transcript from voice_logs where id = ${voiceLogId}) as transcript,
+        (select count(*)::int from workspace_changes where workspace_id = ${actor.personalWorkspaceId} and entity_type = 'voice_log') as voice_changes,
+        (select count(*)::int from audit_events where workspace_id = ${actor.personalWorkspaceId} and entity_type in ('time_entry', 'safety_report')) as consequential
+    `);
+    expect(evidence[0]).toEqual({ transcript: 'Two reviewed hours on site.', voice_changes: 2, consequential: 0 });
   });
 });

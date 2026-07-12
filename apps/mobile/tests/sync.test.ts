@@ -58,4 +58,19 @@ describe('mobile synchronization replica', () => {
     expect(await database.getFirstAsync('SELECT cursor FROM sync_cursors WHERE workspace_id = ?', workspaceId))
       .toEqual({ cursor: 'signed-cursor-2' });
   });
+
+  it('applies transcription completion as a voice-log delta without creating time or safety records', async () => {
+    const voiceLogId = '01980f58-9b8d-7000-8000-000000000026';
+    await applySyncTransaction(database, workspaceId, {
+      cursor: 'signed-cursor-voice',
+      changes: [{
+        sequence: 3, entityType: 'voice_log', entityId: voiceLogId, operation: 'upsert', version: 2,
+        payload: { transcript: 'Two hours on site.', transcriptConfidence: 9000, transcriptProvider: 'deepgram', updatedAt: '2026-07-12T00:00:00Z' },
+      }],
+    }, []);
+    expect(await database.getFirstAsync('SELECT transcript, confidence, provider FROM voice_logs WHERE id = ?', voiceLogId))
+      .toEqual({ transcript: 'Two hours on site.', confidence: 0.9, provider: 'deepgram' });
+    expect(await database.getFirstAsync<{ count: number }>('SELECT count(*) AS count FROM time_entries')).toEqual({ count: 0 });
+    expect(await database.getFirstAsync<{ count: number }>('SELECT count(*) AS count FROM safety_reports')).toEqual({ count: 0 });
+  });
 });

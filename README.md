@@ -58,7 +58,8 @@ bun run db:migrate     # apply committed PostgreSQL migrations
 - `apps/mobile/db/` contains the SQLite migration and repository boundary.
 - `apps/mobile/providers/AppProvider.tsx` is the application facade consumed by screens.
 - `apps/mobile/tests/` covers pure rules, repository transactions, migrations, and shared component state.
-- `apps/api/`, `apps/worker/`, and `apps/admin/` are reserved for production services.
+- `apps/api/` serves the REST/OpenAPI surface and `apps/worker/` runs durable background processing; `apps/admin/` is reserved for the supervisor console.
+- `packages/transcription/` contains provider-independent transcription processing and the Deepgram adapter.
 - `packages/` contains code shared across applications.
 - `infra/compose.yaml` runs local PostgreSQL, Redis, MinIO, and Mailpit dependencies.
 

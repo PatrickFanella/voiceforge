@@ -14,6 +14,7 @@ VoiceForge is being implemented as a contract-first TypeScript platform. Node.js
 - Team creation, workspace-scoped role policies, opaque invitation tokens stored only as SHA-256 digests, and transactional invitation acceptance
 - Workspace-scoped job CRUD with optimistic versions, tombstones, monotonic change-feed records, idempotent mutation replay, and hash-chained audit events in one PostgreSQL transaction
 - Workspace-bound signed sync cursors, paginated delta feeds, per-mutation replay/conflict results, and a mobile SQLite outbox that survives network failure and replica rebuilds
+- Private presigned audio uploads, durable transcription jobs, BullMQ retry/recovery workers, and a replaceable Deepgram provider adapter
 
 The schema is intentionally expanded milestone by milestone. Workflow tables for voice, time approval, safety triage, billing, notifications, exports, webhooks, retention, and legal holds are added with their corresponding domain behavior rather than as unused placeholders.
 
@@ -34,6 +35,8 @@ Auth0 supplies identity only. Roles, invitations, memberships, and workspace acc
 Job mutations acquire transaction-scoped advisory locks for idempotency keys and workspace audit sequencing. Reusing a key with the same request returns the original result; reusing it for a different request is rejected. A stale `baseVersion` returns `VERSION_CONFLICT`. Deletes retain a tombstone and audit evidence. If audit insertion fails, the entity mutation, change-feed record, and idempotency record roll back together.
 
 Mobile synchronization always pushes its outbox before pulling deltas. Pull changes and outbox acknowledgements are applied in one SQLite transaction. Conflicting local mutations remain queued with the corresponding server change payload for explicit resolution. A rebuild deletes only acknowledged synchronized replicas; local and pending records are preserved before replaying the feed from sequence zero.
+
+Audio uploads are signed for fifteen minutes and bind content type and length. AWS deployments additionally require SSE-S3; local MinIO omits that unsupported development header. Workers validate stored type and length before invoking the provider, retry transient failures with exponential backoff, mark exhausted or invalid jobs failed, and periodically recover durable queued rows missing from Redis. Completion and manual transcript review enter the workspace change feed. A transcript never creates time or safety evidence automatically.
 
 ## Migration policy
 

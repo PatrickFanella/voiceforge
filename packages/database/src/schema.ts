@@ -32,6 +32,7 @@ export const workspaceRole = pgEnum('workspace_role', ['owner', 'admin', 'superv
 export const membershipStatus = pgEnum('membership_status', ['invited', 'active', 'suspended', 'removed']);
 export const invitationStatus = pgEnum('invitation_status', ['pending', 'accepted', 'revoked', 'expired']);
 export const changeOperation = pgEnum('change_operation', ['upsert', 'delete']);
+export const transcriptionStatus = pgEnum('transcription_status', ['queued', 'processing', 'completed', 'failed']);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey(),
@@ -101,6 +102,48 @@ export const jobs = pgTable('jobs', {
   status: text('status').notNull().default('active'),
   ...syncMetadata(),
 }, (table) => [index('jobs_workspace_updated_idx').on(table.workspaceId, table.updatedAt)]);
+
+export const audioObjects = pgTable('audio_objects', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  objectKey: text('object_key').notNull(),
+  contentType: text('content_type').notNull(),
+  expectedBytes: bigint('expected_bytes', { mode: 'number' }).notNull(),
+  uploadedBytes: bigint('uploaded_bytes', { mode: 'number' }),
+  checksumSha256: text('checksum_sha256'),
+  uploadedAt: timestamp('uploaded_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  ...timestamps(),
+}, (table) => [uniqueIndex('audio_objects_key_unique').on(table.objectKey), index('audio_objects_workspace_idx').on(table.workspaceId)]);
+
+export const voiceLogs = pgTable('voice_logs', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  jobId: uuid('job_id').references(() => jobs.id, { onDelete: 'set null' }),
+  transcript: text('transcript'),
+  transcriptConfidence: integer('transcript_confidence_basis_points'),
+  transcriptProvider: text('transcript_provider'),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  ...syncMetadata(),
+}, (table) => [index('voice_logs_workspace_updated_idx').on(table.workspaceId, table.updatedAt)]);
+
+export const transcriptionJobs = pgTable('transcription_jobs', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  voiceLogId: uuid('voice_log_id').notNull().references(() => voiceLogs.id, { onDelete: 'cascade' }),
+  audioObjectId: uuid('audio_object_id').notNull().references(() => audioObjects.id, { onDelete: 'restrict' }),
+  status: transcriptionStatus('status').notNull().default('queued'),
+  provider: text('provider'),
+  attemptCount: integer('attempt_count').notNull().default(0),
+  errorCode: text('error_code'),
+  errorMessage: text('error_message'),
+  processingMetadata: jsonb('processing_metadata').notNull().default({}),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  ...timestamps(),
+}, (table) => [index('transcription_jobs_workspace_status_idx').on(table.workspaceId, table.status)]);
 
 export const workspaceChanges = pgTable('workspace_changes', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),

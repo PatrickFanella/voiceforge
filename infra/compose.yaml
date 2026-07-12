@@ -40,6 +40,16 @@ services:
       timeout: 3s
       retries: 10
 
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "mc alias set local http://minio:9000 voiceforge voiceforge-local-only && mc mb --ignore-existing local/voiceforge-audio && mc anonymous set none local/voiceforge-audio"
+    restart: "no"
+
   mailpit:
     image: axllent/mailpit:latest
     ports: ["1025:1025", "8025:8025"]

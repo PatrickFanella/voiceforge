@@ -86,7 +86,6 @@ export async function applySyncTransaction(
     }
 
     for (const change of page.changes) {
-      if (change.entityType !== 'job') continue;
       const pending = await db.getFirstAsync<{ mutationId: string }>(
         'SELECT mutation_id AS mutationId FROM sync_outbox WHERE workspace_id = ? AND entity_id = ? LIMIT 1', workspaceId, change.entityId,
       );
@@ -97,6 +96,25 @@ export async function applySyncTransaction(
         );
         continue;
       }
+      if (change.entityType === 'voice_log' && change.operation === 'upsert') {
+        const payload = change.payload ?? {};
+        const transcript = typeof payload.transcript === 'string' ? payload.transcript : '';
+        const provider = typeof payload.transcriptProvider === 'string' ? payload.transcriptProvider : null;
+        const confidence = typeof payload.transcriptConfidence === 'number' ? payload.transcriptConfidence / 10_000 : null;
+        const timestamp = typeof payload.updatedAt === 'string' ? payload.updatedAt : now();
+        await db.runAsync(
+          `INSERT INTO voice_logs
+            (id, timestamp, transcript, category, processed, job_id, audio_uri, confidence, provider, created_at, updated_at,
+             workspace_id, server_version, sync_status, deleted_at)
+           VALUES (?, ?, ?, 'note', 0, NULL, NULL, ?, ?, ?, ?, ?, ?, 'synced', NULL)
+           ON CONFLICT(id) DO UPDATE SET transcript = excluded.transcript, confidence = excluded.confidence,
+             provider = excluded.provider, updated_at = excluded.updated_at, server_version = excluded.server_version,
+             sync_status = 'synced', deleted_at = NULL`,
+          change.entityId, timestamp, transcript, confidence, provider, timestamp, timestamp, workspaceId, change.version,
+        );
+        continue;
+      }
+      if (change.entityType !== 'job') continue;
       if (change.operation === 'delete') {
         await db.runAsync(
           `UPDATE jobs SET deleted_at = ?, server_version = ?, sync_status = 'synced', updated_at = ? WHERE id = ? AND workspace_id = ?`,
