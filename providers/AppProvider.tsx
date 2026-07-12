@@ -1,68 +1,96 @@
 import { useState, useEffect, useCallback } from 'react';
 import createContextHook from '@nkzw/create-context-hook';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useQuery, useMutation } from '@tanstack/react-query';
 import { Job, TimeEntry, SafetyReport, VoiceLog } from '@/types';
 import { mockJobs, mockTimeEntries, mockSafetyReports, mockVoiceLogs, mockWorker } from '@/mocks/data';
+import { getRepository } from '@/db';
+import { getLocalDateKey } from '@/domain/time';
 
-const STORAGE_KEYS = {
-  JOBS: 'voiceforge_jobs',
-  TIME_ENTRIES: 'voiceforge_time_entries',
-  SAFETY_REPORTS: 'voiceforge_safety_reports',
-  VOICE_LOGS: 'voiceforge_voice_logs',
-  CLOCK_IN: 'voiceforge_clock_in',
-} as const;
+interface ClockState {
+  clockedIn: boolean;
+  clockInTime: string | null;
+}
+
+const DEFAULT_CLOCK_STATE: ClockState = { clockedIn: false, clockInTime: null };
 
 export const [AppProvider, useApp] = createContextHook(() => {
-  const [jobs, setJobs] = useState<Job[]>(mockJobs);
-  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>(mockTimeEntries);
-  const [safetyReports, setSafetyReports] = useState<SafetyReport[]>(mockSafetyReports);
-  const [voiceLogs, setVoiceLogs] = useState<VoiceLog[]>(mockVoiceLogs);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
+  const [safetyReports, setSafetyReports] = useState<SafetyReport[]>([]);
+  const [voiceLogs, setVoiceLogs] = useState<VoiceLog[]>([]);
   const [clockedIn, setClockedIn] = useState<boolean>(false);
   const [clockInTime, setClockInTime] = useState<string | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>('j1');
-
-  const clockQuery = useQuery({
-    queryKey: ['clockStatus'],
-    queryFn: async () => {
-      const stored = await AsyncStorage.getItem(STORAGE_KEYS.CLOCK_IN);
-      return stored ? JSON.parse(stored) : { clockedIn: false, clockInTime: null };
-    },
-  });
+  const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (clockQuery.data) {
-      setClockedIn(clockQuery.data.clockedIn);
-      setClockInTime(clockQuery.data.clockInTime);
+    let active = true;
+
+    async function hydrate() {
+      try {
+        const repository = await getRepository();
+        await repository.seedDemoData({
+          jobs: mockJobs,
+          timeEntries: mockTimeEntries,
+          safetyReports: mockSafetyReports,
+          voiceLogs: mockVoiceLogs,
+        });
+        const [storedJobs, storedTimeEntries, storedSafetyReports, storedVoiceLogs, clockState, storedActiveJobId] =
+          await Promise.all([
+            repository.getJobs(),
+            repository.getTimeEntries(),
+            repository.getSafetyReports(),
+            repository.getVoiceLogs(),
+            repository.getSetting<ClockState>('clock_state', DEFAULT_CLOCK_STATE),
+            repository.getSetting<string | null>('active_job_id', 'j1'),
+          ]);
+
+        if (!active) return;
+        setJobs(storedJobs);
+        setTimeEntries(storedTimeEntries);
+        setSafetyReports(storedSafetyReports);
+        setVoiceLogs(storedVoiceLogs);
+        setClockedIn(clockState.clockedIn);
+        setClockInTime(clockState.clockInTime);
+        setActiveJobId(storedActiveJobId);
+      } catch (error) {
+        if (active) setLoadError(error instanceof Error ? error.message : 'Unable to load VoiceForge data');
+      } finally {
+        if (active) setReady(true);
+      }
     }
-  }, [clockQuery.data]);
 
-  const clockMutation = useMutation({
-    mutationFn: async (data: { clockedIn: boolean; clockInTime: string | null }) => {
-      await AsyncStorage.setItem(STORAGE_KEYS.CLOCK_IN, JSON.stringify(data));
-      return data;
-    },
-    onSuccess: (data) => {
-      setClockedIn(data.clockedIn);
-      setClockInTime(data.clockInTime);
-    },
-  });
+    void hydrate();
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  const toggleClock = useCallback(() => {
-    if (clockedIn) {
-      clockMutation.mutate({ clockedIn: false, clockInTime: null });
-    } else {
-      clockMutation.mutate({ clockedIn: true, clockInTime: new Date().toISOString() });
-    }
-  }, [clockedIn, clockMutation]);
+  const toggleClock = useCallback(async () => {
+    const nextState = clockedIn
+      ? DEFAULT_CLOCK_STATE
+      : { clockedIn: true, clockInTime: new Date().toISOString() };
+    const repository = await getRepository();
+    await repository.setSetting('clock_state', nextState);
+    setClockedIn(nextState.clockedIn);
+    setClockInTime(nextState.clockInTime);
+  }, [clockedIn]);
 
-  const addVoiceLog = useCallback((log: VoiceLog) => {
+  const addVoiceLog = useCallback(async (log: VoiceLog) => {
+    const repository = await getRepository();
+    await repository.addVoiceLog(log);
     setVoiceLogs(prev => [log, ...prev]);
+  }, []);
+
+  const selectActiveJob = useCallback(async (jobId: string | null) => {
+    const repository = await getRepository();
+    await repository.setSetting('active_job_id', jobId);
+    setActiveJobId(jobId);
   }, []);
 
   const worker = mockWorker;
   const activeJob = jobs.find(j => j.id === activeJobId) ?? null;
-  const todayEntries = timeEntries.filter(e => e.date === '2026-02-28');
+  const todayEntries = timeEntries.filter(e => e.date === getLocalDateKey());
   const todayHours = todayEntries.reduce((sum, e) => sum + e.hours, 0);
   const activeJobs = jobs.filter(j => j.status === 'active');
 
@@ -76,11 +104,13 @@ export const [AppProvider, useApp] = createContextHook(() => {
     clockInTime,
     activeJob,
     activeJobId,
-    setActiveJobId,
+    setActiveJobId: selectActiveJob,
     toggleClock,
     addVoiceLog,
     todayEntries,
     todayHours,
     activeJobs,
+    ready,
+    loadError,
   };
 });

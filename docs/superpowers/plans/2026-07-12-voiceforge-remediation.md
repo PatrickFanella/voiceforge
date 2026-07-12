@@ -59,12 +59,12 @@
 
 ## Milestone 2: SQLite source of truth
 
-- [ ] Add `expo-sqlite` using the Expo-compatible installer and create a versioned migration runner.
-- [ ] Define tables for jobs, time entries, safety reports, voice logs, settings, and audit events with foreign keys and ISO timestamps.
-- [ ] Add repository tests against an in-memory SQLite database for insert, update, restart hydration, cascading restrictions, and migration idempotence.
-- [ ] Replace mock-backed provider state with repository queries and mutations; seed demo data once using a migration/setting marker.
-- [ ] Persist clock state and replace the hard-coded date with a clock-injected current-date helper.
-- [ ] Run database tests, typecheck, lint, and export; commit as `feat: add durable sqlite data layer`.
+- [x] Add `expo-sqlite` using the Expo-compatible installer and create a versioned migration runner.
+- [x] Define tables for jobs, time entries, safety reports, voice logs, settings, and audit events with foreign keys and ISO timestamps.
+- [x] Add repository tests against an in-memory SQLite database for insertion, typed hydration, foreign-key restrictions, one-time seeding, and migration idempotence.
+- [x] Replace mock-backed provider state with repository queries and mutations; seed demo data once using a setting marker.
+- [x] Persist clock state and replace the hard-coded date with a clock-injected current-date helper.
+- [x] Run database tests, typecheck, lint, and export; commit as `feat: add durable sqlite data layer`.
 
 ## Milestone 3: Complete navigable product surfaces
 

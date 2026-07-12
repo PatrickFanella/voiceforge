@@ -25,6 +25,7 @@ export interface TimeEntry {
   type: 'regular' | 'overtime' | 'travel';
   notes: string;
   voiceLogged: boolean;
+  sourceVoiceLogId?: string;
 }
 
 export interface SafetyReport {
@@ -37,6 +38,7 @@ export interface SafetyReport {
   description: string;
   resolved: boolean;
   voiceLogged: boolean;
+  sourceVoiceLogId?: string;
 }
 
 export interface VoiceLog {
@@ -46,6 +48,9 @@ export interface VoiceLog {
   category: 'time' | 'safety' | 'materials' | 'note' | 'communication';
   processed: boolean;
   jobId?: string;
+  audioUri?: string;
+  confidence?: number;
+  provider?: string;
 }
 
 export interface WorkerProfile {
