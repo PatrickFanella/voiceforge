@@ -101,3 +101,7 @@ bunx expo-doctor
 ```
 
 Native release candidates also require real-device microphone tests on both iOS and Android and validation of any configured transcription endpoint.
+
+## License
+
+Licensed under `GPL-3.0-or-later`. See [LICENSE](LICENSE).
