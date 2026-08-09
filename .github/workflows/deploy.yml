@@ -26,7 +26,7 @@ jobs:
             cosign sign --yes "$digest"
             echo "${service}_image=$digest" >> "$GITHUB_ENV"
           done
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with: { terraform_version: 1.10.5 }
       - name: Migration preflight
         run: aws ecs run-task --cluster "voiceforge-${{ inputs.environment }}" --task-definition "voiceforge-${{ inputs.environment }}-migration" --launch-type FARGATE --network-configuration "${{ secrets.MIGRATION_NETWORK_CONFIG }}"
