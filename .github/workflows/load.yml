@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: grafana/setup-k6-action@v1
       - uses: grafana/run-k6-action@v1
         with: { path: infra/load/k6.js }

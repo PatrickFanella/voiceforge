@@ -8,14 +8,14 @@ jobs:
   codeql:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: github/codeql-action/init@v3
         with: { languages: javascript-typescript }
       - uses: github/codeql-action/analyze@v3
   secrets-and-dependencies:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
       - uses: gitleaks/gitleaks-action@v2
       - uses: oven-sh/setup-bun@v2
@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy: { matrix: { service: [api, worker, admin] } }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:3000 -f apps/${{ matrix.service }}/Dockerfile -t voiceforge-${{ matrix.service }}:${{ github.sha }} .
       - uses: aquasecurity/trivy-action@0.28.0
         with: { image-ref: "voiceforge-${{ matrix.service }}:${{ github.sha }}", format: sarif, output: "trivy-${{ matrix.service }}.sarif", severity: "CRITICAL,HIGH", exit-code: "1" }

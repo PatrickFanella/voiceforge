@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: "${{ inputs.environment }}"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: aws-actions/configure-aws-credentials@v4
         with: { role-to-assume: "${{ secrets.AWS_DEPLOY_ROLE_ARN }}", aws-region: us-east-1 }
       - uses: aws-actions/amazon-ecr-login@v2
