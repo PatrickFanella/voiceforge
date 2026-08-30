@@ -21,7 +21,7 @@
     "@voiceforge/observability": "workspace:*",
     "@voiceforge/transcription": "workspace:*",
     "@aws-sdk/client-sesv2": "^3.940.0",
-    "bullmq": "^5.66.4"
+    "bullmq": "^6.3.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
