@@ -56,18 +56,18 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.2",
+    "@babel/core": "^8.0.1",
     "@expo/ngrok": "^4.1.0",
-    "@testing-library/react-native": "^13.3.3",
-    "@types/better-sqlite3": "^7.6.13",
+    "@testing-library/react-native": "^14.0.1",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/react": "~19.1.10",
     "@types/react-test-renderer": "^19.1.0",
-    "better-sqlite3": "^12.2.0",
-    "eslint": "^9.31.0",
-    "eslint-config-expo": "~10.0.0",
+    "better-sqlite3": "^13.0.3",
+    "eslint": "^10.9.1",
+    "eslint-config-expo": "~57.0.2",
     "expo-doctor": "^1.17.13",
-    "react-test-renderer": "19.1.0",
-    "typescript": "~5.9.2",
-    "vitest": "^3.2.4"
+    "react-test-renderer": "19.2.8",
+    "typescript": "~7.0.2",
+    "vitest": "^4.1.11"
   }
 }
