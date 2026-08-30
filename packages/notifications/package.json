@@ -6,5 +6,5 @@
   "exports": { ".": "./src/index.ts" },
   "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run", "verify": "bun run typecheck && bun run test" },
   "dependencies": { "@aws-sdk/client-sesv2": "^3.940.0" },
-  "devDependencies": { "@types/node": "^24.10.1", "typescript": "~5.9.2", "vitest": "^3.2.4" }
+  "devDependencies": { "@types/node": "^26.4.0", "typescript": "~7.0.2", "vitest": "^4.1.11" }
 }

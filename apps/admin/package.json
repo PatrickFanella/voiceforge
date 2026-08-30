@@ -6,5 +6,5 @@
   "engines": { "node": ">=22 <23" },
   "scripts": { "dev": "next dev -p 3001", "build": "next build", "start": "next start -p 3001", "typecheck": "tsc --noEmit", "test": "vitest run", "verify": "bun run typecheck && bun run test && bun run build" },
   "dependencies": { "@auth0/nextjs-auth0": "^4.25.0", "@voiceforge/observability": "workspace:*", "next": "^16.0.7", "react": "19.1.0", "react-dom": "19.1.0" },
-  "devDependencies": { "@types/node": "^24.10.1", "@types/react": "^19.2.7", "@types/react-dom": "^19.2.3", "typescript": "~5.9.2", "vitest": "^3.2.4" }
+  "devDependencies": { "@types/node": "^26.4.0", "@types/react": "^19.2.7", "@types/react-dom": "^19.2.3", "typescript": "~7.0.2", "vitest": "^4.1.11" }
 }
