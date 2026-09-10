@@ -10,5 +10,5 @@
     "verify": "bun run typecheck && bun run test"
   },
   "dependencies": { "@sinclair/typebox": "^0.34.41" },
-  "devDependencies": { "typescript": "~5.9.2", "vitest": "^3.2.4" }
+  "devDependencies": { "typescript": "~5.9.2", "vitest": "^5.0.0" }
 }
